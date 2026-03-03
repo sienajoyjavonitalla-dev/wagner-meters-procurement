@@ -1,0 +1,21 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Python environment and caches
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Data and generated outputs (contains pricing/spend data)
+Inventory List with pricing.xlsx
+output/
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo

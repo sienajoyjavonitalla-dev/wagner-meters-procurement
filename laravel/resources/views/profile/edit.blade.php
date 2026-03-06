@@ -1,29 +1,20 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Profile') }}
-        </h2>
-    </x-slot>
+@extends('layouts.dark')
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-profile-information-form')
-                </div>
-            </div>
+@section('title', 'Profile')
 
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-password-form')
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.delete-user-form')
-                </div>
-            </div>
+@section('content')
+<div class="app-main-inner" style="padding: 1.5rem 2rem;">
+    <h1 style="font-size: 1.5rem; margin-bottom: 1.5rem; color: #e6edf3;">Profile</h1>
+    <div style="max-width: 42rem; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div style="padding: 1.5rem; background: #161b22; border: 1px solid #30363d; border-radius: 8px;">
+            @include('profile.partials.update-profile-information-form')
+        </div>
+        <div style="padding: 1.5rem; background: #161b22; border: 1px solid #30363d; border-radius: 8px;">
+            @include('profile.partials.update-password-form')
+        </div>
+        <div style="padding: 1.5rem; background: #161b22; border: 1px solid #30363d; border-radius: 8px;">
+            @include('profile.partials.delete-user-form')
         </div>
     </div>
-</x-app-layout>
+</div>
+@endsection

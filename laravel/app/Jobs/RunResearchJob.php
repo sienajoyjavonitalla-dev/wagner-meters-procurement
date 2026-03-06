@@ -4,18 +4,22 @@ namespace App\Jobs;
 
 use App\DTO\PriceFindingData;
 use App\Models\PriceFinding;
+use App\Models\ResearchRun;
 use App\Models\ResearchTask;
 use App\Services\ClaudeResearchService;
 use App\Services\DigiKeyClient;
+use App\Services\FxSnapshotService;
 use App\Services\MappingService;
 use App\Services\MouserClient;
 use App\Services\NexarClient;
+use App\Services\PostProcessResearchService;
 use App\Services\ResearchMatchHelper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class RunResearchJob implements ShouldQueue
 {
@@ -25,11 +29,50 @@ class RunResearchJob implements ShouldQueue
         public ?string $batchId = null,
         public int $limit = 50,
         public bool $useClaudeFallback = true,
+        public ?int $researchRunId = null,
     ) {
         $this->onQueue('default');
     }
 
     public function handle(
+        DigiKeyClient $digiKey,
+        MouserClient $mouser,
+        NexarClient $nexar,
+        ClaudeResearchService $claude,
+        MappingService $mappingService,
+        PostProcessResearchService $postProcess,
+        FxSnapshotService $fxSnapshot,
+    ): void {
+        $run = $this->researchRunId ? ResearchRun::find($this->researchRunId) : null;
+        if ($run) {
+            $run->update(['status' => 'running', 'message' => 'Research job started.']);
+        }
+
+        try {
+            $this->runResearch($digiKey, $mouser, $nexar, $claude, $mappingService);
+            $actionsCount = $postProcess->process();
+            $fxSnapshot->capture();
+
+            if ($run) {
+                $run->update([
+                    'status' => 'completed',
+                    'message' => "Post-process: {$actionsCount} actions upserted. FX snapshot captured.",
+                    'completed_at' => now(),
+                ]);
+            }
+        } catch (Throwable $e) {
+            if ($run) {
+                $run->update([
+                    'status' => 'failed',
+                    'message' => $e->getMessage(),
+                    'completed_at' => now(),
+                ]);
+            }
+            throw $e;
+        }
+    }
+
+    protected function runResearch(
         DigiKeyClient $digiKey,
         MouserClient $mouser,
         NexarClient $nexar,
@@ -51,7 +94,7 @@ class RunResearchJob implements ShouldQueue
         $tasks = $query->orderBy('priority')->limit($this->limit)->get();
 
         if ($tasks->isEmpty()) {
-            return;
+            return; // run will be updated by caller (post-process still runs)
         }
 
         $dataImportId = $tasks->first()->item?->data_import_id;
@@ -147,6 +190,18 @@ class RunResearchJob implements ShouldQueue
                 }
                 $task->update(['status' => 'needs_research', 'notes' => $notes]);
             }
+        }
+    }
+
+    public function failed(?Throwable $exception = null): void
+    {
+        $run = $this->researchRunId ? ResearchRun::find($this->researchRunId) : null;
+        if ($run) {
+            $run->update([
+                'status' => 'failed',
+                'message' => $exception ? $exception->getMessage() : 'Job failed.',
+                'completed_at' => now(),
+            ]);
         }
     }
 

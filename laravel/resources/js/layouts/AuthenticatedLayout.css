@@ -1,0 +1,134 @@
+.authenticated-layout {
+  display: flex;
+  height: 100vh;
+  min-height: 100vh;
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+.app-nav {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #30363d;
+  background: #161b22;
+}
+
+.app-nav-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid #30363d;
+}
+
+.app-nav-logo {
+  width: 160px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.app-nav-logo-text {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.app-nav-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #30363d;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.app-nav-profile .app-nav-icon {
+  flex-shrink: 0;
+  color: #8b949e;
+}
+
+.app-nav-profile-name {
+  font-size: 0.875rem;
+  color: #e6edf3;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-nav-links {
+  flex: 1;
+  padding: 0.75rem 0;
+  overflow-y: auto;
+}
+
+.app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: 0 0.5rem;
+  color: #8b949e;
+  text-decoration: none;
+  font-size: 0.9375rem;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.app-nav-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-nav-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.app-nav-link:hover {
+  color: #e6edf3;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-nav-link.active {
+  color: #58a6ff;
+  background: rgba(88, 166, 255, 0.12);
+}
+
+.app-nav-footer {
+  padding: 1rem;
+  border-top: 1px solid #30363d;
+}
+
+.app-nav-logout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.app-nav-logout:hover {
+  color: #e6edf3;
+  border-color: #8b949e;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}

@@ -4,9 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ config('app.name', 'Laravel') }}</title>
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    <title>@yield('title', config('app.name')) – Procurement</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         body { margin: 0; background: #0d1117; color: #e6edf3; }
@@ -93,14 +91,7 @@
             </div>
         </aside>
         <main class="app-main">
-            @isset($header)
-                <header style="padding: 1rem 2rem; border-bottom: 1px solid #30363d;">
-                    <h2 style="font-size: 1.25rem; font-weight: 600; color: #e6edf3;">{{ $header }}</h2>
-                </header>
-            @endisset
-            <div style="padding: 1.5rem 2rem;">
-                {{ $slot }}
-            </div>
+            @yield('content')
         </main>
     </div>
     @stack('scripts')

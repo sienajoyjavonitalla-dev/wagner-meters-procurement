@@ -56,19 +56,14 @@ class RunResearchCommand extends Command
                 app(\App\Services\NexarClient::class),
                 app(\App\Services\ClaudeResearchService::class),
                 app(MappingService::class),
+                $postProcess,
+                $fxSnapshot,
             );
+            $this->info('Post-process and FX snapshot run by job.');
         } else {
             dispatch($job);
             $this->info('Research job dispatched. Process with: php artisan queue:work');
             return self::SUCCESS;
-        }
-
-        $actionsCount = $postProcess->process();
-        $this->info("Post-process: {$actionsCount} actions upserted.");
-
-        if ($this->option('fx')) {
-            $rates = $fxSnapshot->capture();
-            $this->info('FX snapshot captured: ' . count($rates) . ' rates.');
         }
 
         return self::SUCCESS;

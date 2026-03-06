@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreDataImportRequest;
 use App\Jobs\ProcessImportJob;
 use App\Models\DataImport;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -17,7 +18,7 @@ class DataImportController extends Controller
         return view('data-import.create', ['recentImports' => $recent]);
     }
 
-    public function store(StoreDataImportRequest $request): RedirectResponse
+    public function store(StoreDataImportRequest $request): RedirectResponse|JsonResponse
     {
         $dir = 'imports/'.uniqid('run_', true);
         $inventoryPath = $request->file('inventory')->storeAs($dir, 'inventory.'.$request->file('inventory')->getClientOriginalExtension());
@@ -42,7 +43,11 @@ class DataImportController extends Controller
 
         ProcessImportJob::dispatch($import, $inventoryPath, $vendorPriorityPath, $itemSpreadPath, $mpnMapPath);
 
-        return redirect()->route('data-import.create')
-            ->with('success', 'Import queued. Refresh the page in a moment to see status.');
+        $message = 'Import queued. Refresh the page in a moment to see status.';
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return redirect()->route('data-import.create')->with('success', $message);
     }
 }

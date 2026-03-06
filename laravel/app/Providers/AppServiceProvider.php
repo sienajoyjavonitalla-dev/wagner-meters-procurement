@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\DigiKeyClient;
+use App\Services\MouserClient;
+use App\Services\NexarClient;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(DigiKeyClient::class, fn () => DigiKeyClient::fromConfig());
+        $this->app->singleton(MouserClient::class, fn () => MouserClient::fromConfig());
+        $this->app->singleton(NexarClient::class, fn () => NexarClient::fromConfig());
     }
 
     /**

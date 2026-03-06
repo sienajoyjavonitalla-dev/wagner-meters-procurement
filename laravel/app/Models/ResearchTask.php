@@ -17,12 +17,19 @@ class ResearchTask extends Model
         'priority',
         'batch_id',
         'notes',
+        'description',
+        'spend_12m',
+        'qty_12m',
+        'avg_unit_cost_12m',
     ];
 
     protected function casts(): array
     {
         return [
             'priority' => 'integer',
+            'spend_12m' => 'decimal:4',
+            'qty_12m' => 'decimal:4',
+            'avg_unit_cost_12m' => 'decimal:4',
         ];
     }
 

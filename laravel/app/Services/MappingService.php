@@ -92,6 +92,38 @@ class MappingService
     }
 
     /**
+     * Get candidate MPNs to query for this item. Empty if non_catalog.
+     * If strictMapping and status !== 'mapped', returns [].
+     *
+     * @return array<int, string>
+     */
+    public function getCandidateMpns(int $itemId, string $itemPartNumber, string $description, bool $strictMapping): array
+    {
+        if ($this->isNonCatalog($itemId)) {
+            return [];
+        }
+        $mpn = $this->getMappedMpn($itemId);
+        if ($this->getMappingStatus($itemId) === 'mapped' && $mpn !== null && $mpn !== '') {
+            return [$mpn];
+        }
+        if ($strictMapping) {
+            return [];
+        }
+        $inferred = ResearchMatchHelper::extractCandidateMpns($itemPartNumber, $description, 7);
+        $merged = $mpn !== null && $mpn !== '' ? array_merge([$mpn], $inferred) : $inferred;
+        $seen = [];
+        $out = [];
+        foreach ($merged as $t) {
+            $t = trim($t);
+            if ($t !== '' && ! isset($seen[$t])) {
+                $seen[$t] = true;
+                $out[] = $t;
+            }
+        }
+        return array_slice($out, 0, 7);
+    }
+
+    /**
      * Normalize to strict: mapped | non_catalog | needs_mapping.
      */
     protected function normalizeStatus(Mapping $m): string

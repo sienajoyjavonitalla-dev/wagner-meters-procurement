@@ -103,11 +103,13 @@ GQL;
                 }
             }
 
+            $matchedMpn = trim((string) ($part['mpn'] ?? '')) ?: null;
             $findings[] = new PriceFindingData(
                 provider: 'nexar',
                 currency: $currency ?: null,
                 priceBreaks: $priceBreaks,
-                minUnitPrice: $bestPrice
+                minUnitPrice: $bestPrice,
+                matchedMpn: $matchedMpn
             );
         }
 

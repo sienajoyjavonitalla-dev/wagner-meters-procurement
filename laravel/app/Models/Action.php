@@ -11,6 +11,7 @@ class Action extends Model
         'research_task_id',
         'estimated_savings',
         'action_type',
+        'priority_score',
         'approval_status',
     ];
 
@@ -18,6 +19,7 @@ class Action extends Model
     {
         return [
             'estimated_savings' => 'decimal:4',
+            'priority_score' => 'decimal:4',
         ];
     }
 

@@ -14,11 +14,12 @@ final readonly class PriceFindingData
         /** @var array<int, array{qty: int, price: float}> */
         public array $priceBreaks,
         public ?float $minUnitPrice,
+        public ?string $matchedMpn = null,
     ) {
     }
 
     /**
-     * @return array{provider: string, currency: ?string, price_breaks_json: array, min_unit_price: ?float}
+     * @return array{provider: string, currency: ?string, price_breaks_json: array, min_unit_price: ?float, matched_mpn: ?string}
      */
     public function toPriceFindingAttributes(): array
     {
@@ -32,6 +33,7 @@ final readonly class PriceFindingData
             'currency' => $this->currency,
             'price_breaks_json' => $breaks,
             'min_unit_price' => $this->minUnitPrice,
+            'matched_mpn' => $this->matchedMpn,
         ];
     }
 }

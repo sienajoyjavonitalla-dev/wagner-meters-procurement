@@ -10,6 +10,7 @@ class PriceFinding extends Model
     protected $fillable = [
         'research_task_id',
         'provider',
+        'matched_mpn',
         'currency',
         'price_breaks_json',
         'min_unit_price',

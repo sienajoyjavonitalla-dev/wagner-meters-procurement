@@ -29,4 +29,18 @@ return [
         'token_url' => env('NEXAR_TOKEN_URL', 'https://identity.nexar.com/connect/token'),
         'graphql_url' => env('NEXAR_GRAPHQL_URL', 'https://api.nexar.com/graphql'),
     ],
+
+    'claude' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com/v1'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 1024),
+        'anthropic_version' => env('ANTHROPIC_VERSION', '2023-06-01'),
+    ],
+
+    'research' => [
+        'strict_mapping' => (bool) env('PROCUREMENT_STRICT_MAPPING', true),
+        'min_match_score' => (float) env('PROCUREMENT_MIN_MATCH_SCORE', 0.9),
+        'claude_batch_size' => (int) env('PROCUREMENT_CLAUDE_BATCH_SIZE', 50),
+    ],
 ];

@@ -62,12 +62,14 @@ class MouserClient
             }
             $priceBreaks = $this->parsePriceBreaks($part['PriceBreaks'] ?? []);
             $minPrice = $this->minPriceFromBreaks($priceBreaks);
+            $matchedMpn = trim((string) ($part['ManufacturerPartNumber'] ?? $part['MouserPartNumber'] ?? '')) ?: null;
 
             $findings[] = new PriceFindingData(
                 provider: 'mouser',
                 currency: $minPrice !== null ? 'USD' : null,
                 priceBreaks: $priceBreaks,
-                minUnitPrice: $minPrice
+                minUnitPrice: $minPrice,
+                matchedMpn: $matchedMpn
             );
         }
 

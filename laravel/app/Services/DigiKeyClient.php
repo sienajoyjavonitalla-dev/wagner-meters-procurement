@@ -59,13 +59,20 @@ class DigiKeyClient
 
         $price = $this->parseProductPrice($product);
         $priceBreaks = $this->extractPriceBreaks($product);
+        $matchedMpn = trim((string) (
+            $product['ManufacturerProductNumber']
+            ?? $product['ManufacturerPartNumber']
+            ?? $product['DigiKeyProductNumber']
+            ?? ''
+        )) ?: null;
 
         $currency = $this->config['locale_currency'] ?? 'USD';
         $finding = new PriceFindingData(
             provider: 'digikey',
             currency: $price !== null ? $currency : null,
             priceBreaks: $priceBreaks,
-            minUnitPrice: $price
+            minUnitPrice: $price,
+            matchedMpn: $matchedMpn
         );
 
         return [$finding];

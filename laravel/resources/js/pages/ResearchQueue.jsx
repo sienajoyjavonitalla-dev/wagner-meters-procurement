@@ -1,15 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { apiGet } from '../api';
+import ButtonIcon from '../components/ui/ButtonIcon';
 
 const API = '/api/procurement/queue';
-
-function BtnIcon({ children }) {
-  return (
-    <span className="employees-btn-icon" aria-hidden="true" style={{ width: 16, height: 16, display: 'inline-flex', marginRight: '0.35rem' }}>
-      {children}
-    </span>
-  );
-}
 
 export default function ResearchQueue() {
   const [result, setResult] = useState({ data: [], meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 } });
@@ -116,11 +109,11 @@ export default function ResearchQueue() {
             lineHeight: 1,
           }}
         >
-          <BtnIcon>
+          <ButtonIcon>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
-          </BtnIcon>
+          </ButtonIcon>
           Apply
         </button>
       </div>

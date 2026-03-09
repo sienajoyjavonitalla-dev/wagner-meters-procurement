@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiGet } from '../api';
+import ButtonIcon from '../components/ui/ButtonIcon';
 
 const API = '/api/procurement/mapping-review';
 
@@ -17,14 +18,6 @@ function downloadCSV(filename, content) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
-}
-
-function BtnIcon({ children }) {
-  return (
-    <span className="employees-btn-icon" aria-hidden="true" style={{ width: 16, height: 16, display: 'inline-flex', marginRight: '0.35rem' }}>
-      {children}
-    </span>
-  );
 }
 
 export default function MappingReview() {
@@ -107,13 +100,13 @@ export default function MappingReview() {
           lineHeight: 1,
         }}
       >
-        <BtnIcon>
+        <ButtonIcon>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-        </BtnIcon>
+        </ButtonIcon>
         Download full CSV
       </button>
 

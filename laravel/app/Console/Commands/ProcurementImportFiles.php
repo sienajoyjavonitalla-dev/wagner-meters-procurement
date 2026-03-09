@@ -4,8 +4,10 @@ namespace App\Console\Commands;
 
 use App\Jobs\ProcessImportJob;
 use App\Models\DataImport;
+use App\Services\AuditLogService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class ProcurementImportFiles extends Command
 {
@@ -17,7 +19,7 @@ class ProcurementImportFiles extends Command
 
     protected $description = 'One-time import: load inventory, vendor priority, item spread, and optional MPN map from local paths (snapshot: replaces previous full import).';
 
-    public function handle(): int
+    public function handle(AuditLogService $auditLog): int
     {
         $inventory = $this->argument('inventory');
         $vendorPriority = $this->argument('vendor_priority');
@@ -47,11 +49,12 @@ class ProcurementImportFiles extends Command
 
         $this->info('Copying files into storage...');
         Storage::makeDirectory($dir);
-        copy($this->resolvePath($inventory), Storage::path($inventoryPath));
-        copy($this->resolvePath($vendorPriority), Storage::path($vendorPriorityPath));
-        copy($this->resolvePath($itemSpread), Storage::path($itemSpreadPath));
+        File::ensureDirectoryExists(dirname(storage_path('app/'.$inventoryPath)));
+        copy($this->resolvePath($inventory), storage_path('app/'.$inventoryPath));
+        copy($this->resolvePath($vendorPriority), storage_path('app/'.$vendorPriorityPath));
+        copy($this->resolvePath($itemSpread), storage_path('app/'.$itemSpreadPath));
         if ($mpnMapPath !== null) {
-            copy($this->resolvePath($mpnMap), Storage::path($mpnMapPath));
+            copy($this->resolvePath($mpnMap), storage_path('app/'.$mpnMapPath));
         }
 
         $import = DataImport::create([
@@ -65,6 +68,9 @@ class ProcurementImportFiles extends Command
             ],
             'row_counts' => [],
             'status' => 'pending',
+        ]);
+        $auditLog->log('import.created', null, 'data_import', $import->id, [
+            'files' => $import->file_names,
         ]);
 
         $this->info('Running import (sync)...');

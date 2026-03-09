@@ -78,9 +78,6 @@ export default function Login() {
             </button>
           </div>
         </form>
-        <p style={{ marginTop: '1.5rem', fontSize: '0.875rem', color: '#8b949e' }}>
-          <Link to="/register" style={linkStyle}>Register</Link> if you don’t have an account.
-        </p>
       </div>
     </div>
   );

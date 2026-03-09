@@ -103,7 +103,14 @@
 
 .app-nav-footer {
   padding: 1rem;
+  margin-top: 0.5rem;
   border-top: 1px solid #30363d;
+}
+
+.app-nav-footer-separator {
+  border: 0;
+  border-top: 1px solid #30363d;
+  margin: 0 0 0.6rem;
 }
 
 .app-nav-logout {

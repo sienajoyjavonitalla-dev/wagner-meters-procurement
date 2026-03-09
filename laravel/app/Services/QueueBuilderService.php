@@ -15,9 +15,10 @@ use Illuminate\Support\Str;
 class QueueBuilderService
 {
     public function __construct(
-        protected int $topVendors = 20,
-        protected int $itemsPerVendor = 50,
-        protected int $topSpreadItems = 100,
+        protected AppSettingsService $settings,
+        protected ?int $topVendors = null,
+        protected ?int $itemsPerVendor = null,
+        protected ?int $topSpreadItems = null,
     ) {
     }
 
@@ -29,6 +30,11 @@ class QueueBuilderService
      */
     public function build(?DataImport $import = null): array
     {
+        $defaults = $this->settings->getResearchSettings();
+        $topVendors = $this->topVendors ?? (int) ($defaults['top_vendors'] ?? 20);
+        $itemsPerVendor = $this->itemsPerVendor ?? (int) ($defaults['items_per_vendor'] ?? 50);
+        $topSpreadItems = $this->topSpreadItems ?? (int) ($defaults['top_spread_items'] ?? 100);
+
         $import = $import ?? DataImport::currentFull()->first();
         if (! $import) {
             return ['created' => 0, 'batch_id' => '', 'import_id' => null];
@@ -40,7 +46,7 @@ class QueueBuilderService
         $wantedVendorNames = VendorPriority::query()
             ->where('data_import_id', $import->id)
             ->orderBy('priority_rank')
-            ->limit($this->topVendors)
+            ->limit($topVendors)
             ->pluck('vendor_name')
             ->all();
 
@@ -103,13 +109,13 @@ class QueueBuilderService
         $baseRows = [];
         foreach ($bySupplier as $supplierId => $rows) {
             usort($rows, fn ($a, $b) => $b['spend_12m'] <=> $a['spend_12m']);
-            $baseRows = array_merge($baseRows, array_slice($rows, 0, $this->itemsPerVendor));
+            $baseRows = array_merge($baseRows, array_slice($rows, 0, $itemsPerVendor));
         }
 
         $spreadPartNumbers = ItemSpread::query()
             ->where('data_import_id', $import->id)
             ->orderBy('id')
-            ->limit($this->topSpreadItems)
+            ->limit($topSpreadItems)
             ->pluck('internal_part_number')
             ->all();
 

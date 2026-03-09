@@ -21,7 +21,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/data-import', fn () => view('app'))->name('data-import.create');
-    Route::post('/data-import', [DataImportController::class, 'store'])->name('data-import.store');
+    Route::post('/data-import', [DataImportController::class, 'store'])
+        ->middleware('can:manage-procurement')
+        ->name('data-import.store');
 });
 
 require __DIR__.'/auth.php';

@@ -12,13 +12,18 @@ use App\Models\Mapping;
 use App\Models\PriceFinding;
 use App\Models\ResearchRun;
 use App\Models\ResearchTask;
+use App\Models\User;
 use App\Services\DigiKeyClient;
 use App\Services\QueueBuilderService;
 use App\Services\MouserClient;
 use App\Services\NexarClient;
 use App\Services\ClaudeResearchService;
+use App\Services\AppSettingsService;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ProcurementController extends Controller
 {
@@ -91,6 +96,56 @@ class ProcurementController extends Controller
             'mapping_counts' => $mappingCounts,
             'modeled_savings_total' => round((float) $modeledSavingsTotal, 4),
             'provider_hit_counts' => $providerHitCounts,
+        ]);
+    }
+
+    /**
+     * 6.1.4 GET analytics: supplier savings and daily trend.
+     */
+    public function analytics(): JsonResponse
+    {
+        $importId = $this->currentImportId();
+        if ($importId === null) {
+            return response()->json([
+                'top_suppliers_by_savings' => [],
+                'daily_modeled_savings' => [],
+            ]);
+        }
+
+        $taskIds = $this->tasksForCurrentImport()->pluck('id');
+
+        $supplierSavings = Action::query()
+            ->join('research_tasks', 'actions.research_task_id', '=', 'research_tasks.id')
+            ->join('suppliers', 'research_tasks.supplier_id', '=', 'suppliers.id')
+            ->whereIn('actions.research_task_id', $taskIds)
+            ->selectRaw('suppliers.name as supplier_name, sum(actions.estimated_savings) as savings_total')
+            ->groupBy('suppliers.name')
+            ->orderByDesc('savings_total')
+            ->limit(10)
+            ->get()
+            ->map(fn ($row) => [
+                'supplier_name' => $row->supplier_name,
+                'savings_total' => round((float) $row->savings_total, 4),
+            ])
+            ->values()
+            ->all();
+
+        $dailySavings = Action::query()
+            ->whereIn('research_task_id', $taskIds)
+            ->selectRaw('DATE(created_at) as day, sum(estimated_savings) as savings_total')
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('day')
+            ->get()
+            ->map(fn ($row) => [
+                'day' => (string) $row->day,
+                'savings_total' => round((float) $row->savings_total, 4),
+            ])
+            ->values()
+            ->all();
+
+        return response()->json([
+            'top_suppliers_by_savings' => $supplierSavings,
+            'daily_modeled_savings' => $dailySavings,
         ]);
     }
 
@@ -379,7 +434,12 @@ class ProcurementController extends Controller
     /**
      * 3.2.1 POST trigger research run
      */
-    public function triggerRun(Request $request, QueueBuilderService $queueBuilder): JsonResponse
+    public function triggerRun(
+        Request $request,
+        QueueBuilderService $queueBuilder,
+        AppSettingsService $settings,
+        AuditLogService $auditLog
+    ): JsonResponse
     {
         $import = DataImport::currentFull()->first();
         if (! $import) {
@@ -390,10 +450,14 @@ class ProcurementController extends Controller
         $agentFallback = strtolower(trim((string) $request->input('agent_fallback', 'claude')));
         $batchSize = (int) $request->input('batch_size', 50);
         $batchSize = max(1, min($batchSize, 500));
+        $configured = $settings->getResearchSettings();
 
         $batchId = null;
         if ($build) {
-            $queueBuilder->setTopVendors(20)->setItemsPerVendor(50)->setTopSpreadItems(100);
+            $queueBuilder
+                ->setTopVendors((int) ($configured['top_vendors'] ?? 20))
+                ->setItemsPerVendor((int) ($configured['items_per_vendor'] ?? 50))
+                ->setTopSpreadItems((int) ($configured['top_spread_items'] ?? 100));
             $result = $queueBuilder->build($import);
             $batchId = $result['batch_id'] ?: null;
         }
@@ -409,12 +473,70 @@ class ProcurementController extends Controller
 
         dispatch(new RunResearchJob($batchId, $batchSize, $run->use_claude, $run->id));
 
+        $auditLog->log('research.run.queued', $request->user()?->id, 'research_run', $run->id, [
+            'build_queue' => $build,
+            'batch_size' => $batchSize,
+            'agent_fallback' => $agentFallback,
+            'batch_id' => $batchId,
+        ]);
+
         $statusUrl = url('/api/procurement/run-status?run_id=' . $run->id);
 
         return response()->json([
             'run_id' => $run->id,
             'status_url' => $statusUrl,
         ], 202);
+    }
+
+    /**
+     * 6.1.5 GET runtime settings.
+     */
+    public function settings(AppSettingsService $settings): JsonResponse
+    {
+        return response()->json([
+            'research' => $settings->getResearchSettings(),
+        ]);
+    }
+
+    /**
+     * 6.1.5 POST runtime settings update (admin).
+     */
+    public function updateSettings(
+        Request $request,
+        AppSettingsService $settings,
+        AuditLogService $auditLog
+    ): JsonResponse {
+        $validated = $request->validate([
+            'strict_mapping' => ['sometimes', 'boolean'],
+            'min_match_score' => ['sometimes', 'numeric', 'min:0', 'max:1'],
+            'claude_batch_size' => ['sometimes', 'integer', 'min:1', 'max:500'],
+            'top_vendors' => ['sometimes', 'integer', 'min:1', 'max:200'],
+            'items_per_vendor' => ['sometimes', 'integer', 'min:1', 'max:500'],
+            'top_spread_items' => ['sometimes', 'integer', 'min:1', 'max:1000'],
+            'nightly_enabled' => ['sometimes', 'boolean'],
+            'nightly_time' => ['sometimes', 'date_format:H:i'],
+        ]);
+
+        $payload = collect($validated)->only([
+            'strict_mapping',
+            'min_match_score',
+            'claude_batch_size',
+            'top_vendors',
+            'items_per_vendor',
+            'top_spread_items',
+            'nightly_enabled',
+            'nightly_time',
+        ])->all();
+
+        $updated = $settings->updateResearchSettings($payload);
+        $auditLog->log('settings.updated', $request->user()?->id, 'system_setting', AppSettingsService::RESEARCH_KEY, [
+            'updated' => $updated,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'research' => $updated,
+        ]);
     }
 
     /**
@@ -443,6 +565,200 @@ class ProcurementController extends Controller
             'message' => $run->message,
             'completed_at' => $run->completed_at?->toIso8601String(),
             'created_at' => $run->created_at->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * 6.1.3 GET users for user management.
+     */
+    public function users(Request $request): JsonResponse
+    {
+        $users = User::query()
+            ->orderBy('id')
+            ->get(['id', 'first_name', 'last_name', 'email', 'role', 'created_at'])
+            ->map(fn (User $u) => [
+                'id' => $u->id,
+                'first_name' => $u->first_name,
+                'last_name' => $u->last_name,
+                'name' => trim(($u->first_name ?? '').' '.($u->last_name ?? '')) ?: $u->email,
+                'email' => $u->email,
+                'role' => $u->role,
+                'created_at' => $u->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => $users,
+            'roles' => [
+                User::ROLE_SUPER_ADMIN,
+                User::ROLE_ADMIN,
+                User::ROLE_VIEWER,
+            ],
+            'can_assign_super_admin' => $request->user()?->can('assign-super-admin') ?? false,
+        ]);
+    }
+
+    /**
+     * 6.1.3 POST create user.
+     */
+    public function createUser(Request $request, AuditLogService $auditLog): JsonResponse
+    {
+        $actor = $request->user();
+        $validated = $request->validate([
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'role' => ['required', Rule::in([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_VIEWER])],
+        ]);
+
+        if ($validated['role'] === User::ROLE_SUPER_ADMIN && ! $actor?->can('assign-super-admin')) {
+            return response()->json(['error' => 'Only super admins can assign super admin role.'], 403);
+        }
+
+        $user = User::create([
+            'first_name' => $validated['first_name'] ?? null,
+            'last_name' => $validated['last_name'] ?? null,
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'role' => $validated['role'],
+        ]);
+
+        $auditLog->log('users.created', $actor?->id, 'user', $user->id, [
+            'email' => $user->email,
+            'role' => $user->role,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => [
+                'id' => $user->id,
+            ],
+        ], 201);
+    }
+
+    /**
+     * 6.1.3 PATCH update user.
+     */
+    public function updateUser(Request $request, User $user, AuditLogService $auditLog): JsonResponse
+    {
+        $actor = $request->user();
+        $validated = $request->validate([
+            'first_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'last_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
+            'role' => ['sometimes', Rule::in([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_VIEWER])],
+        ]);
+
+        $oldRole = (string) $user->role;
+        if (array_key_exists('role', $validated)) {
+            $targetRole = $validated['role'];
+            if ($targetRole === User::ROLE_SUPER_ADMIN && ! $actor?->can('assign-super-admin')) {
+                return response()->json(['error' => 'Only super admins can assign super admin role.'], 403);
+            }
+            if ($oldRole === User::ROLE_SUPER_ADMIN && $targetRole !== User::ROLE_SUPER_ADMIN) {
+                $superAdmins = User::query()->where('role', User::ROLE_SUPER_ADMIN)->count();
+                if ($superAdmins <= 1) {
+                    return response()->json(['error' => 'At least one super admin is required.'], 422);
+                }
+                if (! $actor?->can('assign-super-admin')) {
+                    return response()->json(['error' => 'Only super admins can demote super admin role.'], 403);
+                }
+            }
+        }
+
+        $payload = collect($validated)->except(['password'])->all();
+        if (! empty($validated['password'])) {
+            $payload['password'] = $validated['password'];
+        }
+
+        $user->update($payload);
+        $auditLog->log('users.updated', $actor?->id, 'user', $user->id, [
+            'fields' => array_keys($payload),
+            'from_role' => $oldRole,
+            'to_role' => $user->role,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+        ]);
+    }
+
+    /**
+     * 6.1.3 DELETE user.
+     */
+    public function deleteUser(Request $request, User $user, AuditLogService $auditLog): JsonResponse
+    {
+        $actor = $request->user();
+        if ($actor && (int) $actor->id === (int) $user->id) {
+            return response()->json(['error' => 'You cannot delete your own account.'], 422);
+        }
+
+        if ($user->role === User::ROLE_SUPER_ADMIN) {
+            $superAdmins = User::query()->where('role', User::ROLE_SUPER_ADMIN)->count();
+            if ($superAdmins <= 1) {
+                return response()->json(['error' => 'At least one super admin is required.'], 422);
+            }
+            if (! $actor?->can('assign-super-admin')) {
+                return response()->json(['error' => 'Only super admins can delete super admin users.'], 403);
+            }
+        }
+
+        $deletedUserId = $user->id;
+        $deletedEmail = $user->email;
+        $user->delete();
+
+        $auditLog->log('users.deleted', $actor?->id, 'user', $deletedUserId, [
+            'email' => $deletedEmail,
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 6.1.3 PATCH user role.
+     */
+    public function updateUserRole(
+        Request $request,
+        User $user,
+        AuditLogService $auditLog
+    ): JsonResponse {
+        $actor = $request->user();
+        $validated = $request->validate([
+            'role' => ['required', Rule::in([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_VIEWER])],
+        ]);
+
+        $targetRole = $validated['role'];
+        $oldRole = (string) $user->role;
+
+        if ($targetRole === User::ROLE_SUPER_ADMIN && ! $actor?->can('assign-super-admin')) {
+            return response()->json(['error' => 'Only super admins can assign super admin role.'], 403);
+        }
+
+        if ($oldRole === User::ROLE_SUPER_ADMIN && $targetRole !== User::ROLE_SUPER_ADMIN) {
+            $superAdmins = User::query()->where('role', User::ROLE_SUPER_ADMIN)->count();
+            if ($superAdmins <= 1) {
+                return response()->json(['error' => 'At least one super admin is required.'], 422);
+            }
+            if (! $actor?->can('assign-super-admin')) {
+                return response()->json(['error' => 'Only super admins can demote super admin role.'], 403);
+            }
+        }
+
+        $user->update(['role' => $targetRole]);
+        $auditLog->log('users.role.updated', $actor?->id, 'user', $user->id, [
+            'from' => $oldRole,
+            'to' => $targetRole,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'data' => [
+                'id' => $user->id,
+                'role' => $user->role,
+            ],
         ]);
     }
 }

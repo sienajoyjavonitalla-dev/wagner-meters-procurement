@@ -42,5 +42,13 @@ return [
         'strict_mapping' => (bool) env('PROCUREMENT_STRICT_MAPPING', true),
         'min_match_score' => (float) env('PROCUREMENT_MIN_MATCH_SCORE', 0.9),
         'claude_batch_size' => (int) env('PROCUREMENT_CLAUDE_BATCH_SIZE', 50),
+        'top_vendors' => (int) env('PROCUREMENT_TOP_VENDORS', 20),
+        'items_per_vendor' => (int) env('PROCUREMENT_ITEMS_PER_VENDOR', 50),
+        'top_spread_items' => (int) env('PROCUREMENT_TOP_SPREAD_ITEMS', 100),
+    ],
+
+    'schedule' => [
+        'nightly_enabled' => (bool) env('PROCUREMENT_NIGHTLY_ENABLED', false),
+        'nightly_time' => env('PROCUREMENT_NIGHTLY_TIME', '01:00'),
     ],
 ];

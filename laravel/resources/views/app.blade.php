@@ -14,6 +14,7 @@
                 'email' => auth()->user()->email,
                 'first_name' => auth()->user()->first_name ?? null,
                 'last_name' => auth()->user()->last_name ?? null,
+                'role' => auth()->user()->role ?? 'viewer',
               ]
             : null;
     @endphp

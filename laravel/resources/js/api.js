@@ -1,5 +1,7 @@
 /**
- * Procurement app API: user from Laravel (injected in Blade), logout, and API base for /api/procurement.
+ * Procurement app API (Phase 4.1).
+ * - API base URL: from window.__PROCUREMENT__.apiBase (Laravel Blade injects url('/')).
+ * - Auth: session cookie (credentials: 'include'); user from __PROCUREMENT__.user; logout via POST to logoutUrl with CSRF.
  */
 const config = window.__PROCUREMENT__ || {};
 
@@ -12,6 +14,15 @@ export function getDisplayName() {
 
 export function getUser() {
   return config.user || null;
+}
+
+export function isAdminUser() {
+  const role = config.user?.role || 'viewer';
+  return role === 'admin' || role === 'super_admin';
+}
+
+export function isSuperAdminUser() {
+  return (config.user?.role || 'viewer') === 'super_admin';
 }
 
 export function logout() {
@@ -56,7 +67,7 @@ function getCsrfTokenFromCookie() {
 }
 
 export function getCsrfToken() {
-  return getCsrfTokenFromCookie() || config.csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || '';
+  return config.csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
 
 /** POST form data (e.g. multipart) to a URL; expects JSON response or 422 with JSON errors. */
@@ -64,12 +75,18 @@ export async function apiPostFormData(urlPath, formData) {
   const base = apiBase();
   const url = urlPath.startsWith('http') ? urlPath : `${base}${urlPath}`;
   const token = getCsrfToken();
+  const cookieToken = getCsrfTokenFromCookie();
   if (token && !formData.has('_token')) formData.append('_token', token);
   const res = await fetch(url, {
     method: 'POST',
     body: formData,
     credentials: 'include',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+      ...(cookieToken ? { 'X-XSRF-TOKEN': cookieToken } : {}),
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   });
   if (res.status === 401) {
     window.location.href = config.loginUrl || '/login';
@@ -137,21 +154,75 @@ export async function apiPostAuth(urlPath, formData) {
   return { ok: true, data };
 }
 
-/** PATCH JSON to a URL. */
-export async function apiPatch(path, body) {
+/** POST JSON to a URL. */
+export async function apiPost(path, body) {
   const base = apiBase();
   const url = path.startsWith('http') ? path : `${base}${path}`;
   const token = getCsrfToken();
+  const cookieToken = getCsrfTokenFromCookie();
   const res = await fetch(url, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-CSRF-TOKEN': token,
+      ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+      ...(cookieToken ? { 'X-XSRF-TOKEN': cookieToken } : {}),
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: JSON.stringify(body || {}),
+  });
+  if (res.status === 401) {
+    window.location.href = config.loginUrl || '/login';
+    throw new Error('Unauthorized');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, errors: data.errors || data };
+  return data;
+}
+
+/** PATCH JSON to a URL. */
+export async function apiPatch(path, body) {
+  const base = apiBase();
+  const url = path.startsWith('http') ? path : `${base}${path}`;
+  const token = getCsrfToken();
+  const cookieToken = getCsrfTokenFromCookie();
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+      ...(cookieToken ? { 'X-XSRF-TOKEN': cookieToken } : {}),
       'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify({ ...body, _method: 'PATCH' }),
+  });
+  if (res.status === 401) {
+    window.location.href = config.loginUrl || '/login';
+    throw new Error('Unauthorized');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, errors: data.errors || data };
+  return data;
+}
+
+/** DELETE to a URL. */
+export async function apiDelete(path) {
+  const base = apiBase();
+  const url = path.startsWith('http') ? path : `${base}${path}`;
+  const token = getCsrfToken();
+  const cookieToken = getCsrfTokenFromCookie();
+  const res = await fetch(url, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+      ...(cookieToken ? { 'X-XSRF-TOKEN': cookieToken } : {}),
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   });
   if (res.status === 401) {
     window.location.href = config.loginUrl || '/login';

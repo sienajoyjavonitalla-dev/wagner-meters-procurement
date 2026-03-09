@@ -1,58 +1,55 @@
-# Procurement Research Automation
+# Procurement Research Tool
 
-Internal tooling for procurement pricing research, alternate-part discovery, and prioritized savings actions.
+Procurement pricing and alternate-part research platform, now centered on the Laravel + React application in `laravel/`.
 
-This project is designed to run locally with API credentials loaded from `.env`.
+## Repository Structure
 
-## What This Repository Contains
+- `laravel/`: primary web app (Laravel API + React dashboard)
+- `scripts/`: legacy Python research scripts and validation helpers
+- `dashboard/`: legacy Streamlit dashboard
+- `phase5_1/`: validation artifacts (Python vs Laravel comparison)
+- `phase5_2/`: cutover and sign-off artifacts
 
-- `scripts/research_loop.py`: core research pipeline
-- `scripts/run_research_loop.sh`: wrapper to run the pipeline
-- `dashboard/procurement_dashboard.py`: local Streamlit dashboard
-- `scripts/run_dashboard.sh`: wrapper to run dashboard
-- `RESEARCH_AUTOMATION.md`: operational runbook
+## Primary Workflow (Laravel + React)
 
-## Quick Start
+1. Configure `laravel/.env` (DB + API keys).
+2. Start app:
+   - backend: `php artisan serve` (or Laragon web server)
+   - frontend: `npm run dev`
+3. Import data via UI (`/data-import`) or CLI:
+   - `php artisan procurement:import-files <inventory.xlsx> <vendor_priority.csv> <item_spread.csv> --mpn-map=<mpn_map.csv>`
+4. Build queue and run research:
+   - `php artisan procurement:build-queue`
+   - `php artisan procurement:run-research --sync`
+5. Review in dashboard (`/dashboard`).
 
-1. Create virtualenv and install dependencies:
+## Provider / AI Keys
 
-```bash
-python3 -m venv .venv
-./.venv/bin/pip install pandas openpyxl requests streamlit plotly
-```
+Set in `laravel/.env` (see `laravel/config/procurement.php`):
 
-2. Configure credentials:
+- DigiKey: `DIGIKEY_CLIENT_ID`, `DIGIKEY_CLIENT_SECRET`
+- Mouser: `MOUSER_API_KEY` (or `MOUSER_SEARCH_API_KEY`)
+- Nexar: `NEXAR_CLIENT_ID`, `NEXAR_CLIENT_SECRET`
+- Claude fallback: `ANTHROPIC_API_KEY`
 
-```bash
-cp .env.example .env
-# then fill DIGIKEY/MOUSER/NEXAR keys in .env
-```
+## Phase 5 Artifacts
 
-3. Run research:
+- Validation report: `phase5_1/PHASE_5_1_VALIDATION_REPORT.md`
+- Cutover checklist: `phase5_2/CUTOVER_CHECKLIST.md`
+- Stakeholder sign-off template: `phase5_2/STAKEHOLDER_SIGNOFF.md`
 
-```bash
-./scripts/run_research_loop.sh
-```
+## Legacy Python Workflow (Reference)
 
-4. Launch dashboard:
+Legacy scripts are still available for comparison and rollback planning:
 
-```bash
-./scripts/run_dashboard.sh
-# open http://127.0.0.1:8501
-```
-
-## Pre-Push Security Check
-
-Run this before first push (and before later pushes):
-
-```bash
-./scripts/security_preflight.sh
-```
+- `scripts/research_loop.py`
+- `dashboard/procurement_dashboard.py`
+- runbook: `RESEARCH_AUTOMATION.md`
 
 ## Data Sensitivity
 
 This workflow processes procurement spend and pricing data.
 
-- Do not commit `.env`
-- Do not commit raw inventory spreadsheets or generated `output/` data
-- Use `SECURITY.md` before first push
+- Do not commit `.env` files
+- Do not commit raw production spreadsheets
+- Review `SECURITY.md` before sharing data or publishing changes

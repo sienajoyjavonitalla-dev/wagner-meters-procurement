@@ -1,0 +1,17 @@
+{
+    "batch_id": "50e4c1ab-4a38-4a5e-b6e3-aaa4628708f2",
+    "queue_total": 10,
+    "status_counts": {
+        "needs_research": 6,
+        "skipped_non_catalog": 2,
+        "needs_mapping": 2
+    },
+    "task_type_counts": {
+        "pricing_benchmark": 6,
+        "alternate_part": 4
+    },
+    "price_findings_total": 0,
+    "provider_counts": [],
+    "actions_total": 0,
+    "modeled_savings_total": 0
+}

@@ -1,0 +1,7 @@
+internal_item_id,item_description,mapping_status,mapped_mpn,mapped_mfr,mapping_source,match_confidence,mapping_note,lookup_mode,queue_tasks,researched_tasks,needs_research_tasks,spend_12m
+ABC1234,Resistor ABC1234 10K,mapped,ABC1234,,curated_high_confidence,1.0,curated_high_confidence,catalog_lookup,2,0,2,1200.0
+XYZ9876,Capacitor XYZ9876 10uF,mapped,XYZ9876,,verified,1.0,verified,catalog_lookup,2,0,2,900.0
+LMN5555,Regulator LMN5555 5V,mapped,LMN5555,,erp,1.0,erp,catalog_lookup,2,0,2,800.0
+AAA1111,Connector AAA1111,needs_review,,,missing mapping,0.0,missing mapping,catalog_lookup,1,0,0,500.0
+BBB2222,Relay BBB2222,needs_review,,,missing mapping,0.0,missing mapping,catalog_lookup,1,0,0,400.0
+NC9999,Custom Assembly NC9999,non_catalog,,,custom part,1.0,custom part,non_catalog,2,0,0,600.0

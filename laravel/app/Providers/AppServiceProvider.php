@@ -6,6 +6,8 @@ use App\Services\ClaudeResearchService;
 use App\Services\DigiKeyClient;
 use App\Services\MouserClient;
 use App\Services\NexarClient;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -26,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Gate::define('manage-procurement', fn (User $user) => $user->isAdmin());
+        Gate::define('manage-users', fn (User $user) => $user->isSuperAdmin());
+        Gate::define('assign-super-admin', fn (User $user) => $user->isSuperAdmin());
     }
 }

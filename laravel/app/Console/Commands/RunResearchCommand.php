@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Jobs\RunResearchJob;
 use App\Models\DataImport;
+use App\Services\AppSettingsService;
+use App\Services\AuditLogService;
 use App\Services\FxSnapshotService;
 use App\Services\MappingService;
 use App\Services\PostProcessResearchService;
@@ -34,10 +36,6 @@ class RunResearchCommand extends Command
         }
 
         if ($this->option('build')) {
-            $queueBuilder
-                ->setTopVendors(20)
-                ->setItemsPerVendor(50)
-                ->setTopSpreadItems(100);
             $result = $queueBuilder->build($import);
             $this->info("Queue built: {$result['created']} tasks (batch: {$result['batch_id']}).");
         }
@@ -58,6 +56,8 @@ class RunResearchCommand extends Command
                 app(MappingService::class),
                 $postProcess,
                 $fxSnapshot,
+                app(AppSettingsService::class),
+                app(AuditLogService::class),
             );
             $this->info('Post-process and FX snapshot run by job.');
         } else {

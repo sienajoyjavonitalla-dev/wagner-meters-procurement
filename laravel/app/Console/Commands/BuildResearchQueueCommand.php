@@ -9,9 +9,9 @@ use Illuminate\Console\Command;
 class BuildResearchQueueCommand extends Command
 {
     protected $signature = 'procurement:build-queue
-                            {--vendors=20 : Top N vendors by priority rank}
-                            {--per-vendor=50 : Max items per vendor}
-                            {--spread=100 : Top N items for alternate_part tasks}';
+                            {--vendors= : Top N vendors by priority rank}
+                            {--per-vendor= : Max items per vendor}
+                            {--spread= : Top N items for alternate_part tasks}';
 
     protected $description = 'Build research task queue from the latest full data import';
 
@@ -23,10 +23,15 @@ class BuildResearchQueueCommand extends Command
             return self::FAILURE;
         }
 
-        $builder
-            ->setTopVendors((int) $this->option('vendors'))
-            ->setItemsPerVendor((int) $this->option('per-vendor'))
-            ->setTopSpreadItems((int) $this->option('spread'));
+        if ($this->option('vendors') !== null) {
+            $builder->setTopVendors((int) $this->option('vendors'));
+        }
+        if ($this->option('per-vendor') !== null) {
+            $builder->setItemsPerVendor((int) $this->option('per-vendor'));
+        }
+        if ($this->option('spread') !== null) {
+            $builder->setTopSpreadItems((int) $this->option('spread'));
+        }
 
         $result = $builder->build($import);
 

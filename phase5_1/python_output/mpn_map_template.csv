@@ -1,0 +1,7 @@
+Item ID,description,candidate_hint_tokens,lookup_mode,mpn,notes
+AAA1111,Connector AAA1111,[],catalog_lookup,,
+ABC1234,Resistor ABC1234 10K,['ABC1234'],catalog_lookup,,
+BBB2222,Relay BBB2222,[],catalog_lookup,,
+LMN5555,Regulator LMN5555 5V,['LMN5555'],catalog_lookup,,
+NC9999,Custom Assembly NC9999,[],non_catalog,,
+XYZ9876,Capacitor XYZ9876 10uF,['XYZ9876'],catalog_lookup,,

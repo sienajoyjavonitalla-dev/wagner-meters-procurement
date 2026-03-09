@@ -1,0 +1,21 @@
+{
+  "queue_total": 10,
+  "status_counts": {
+    "needs_research": 6,
+    "skipped_non_catalog": 2,
+    "needs_mapping": 2
+  },
+  "task_type_counts": {
+    "pricing_benchmark": 6,
+    "alternate_part": 4
+  },
+  "price_findings_total": 0,
+  "provider_counts": {},
+  "actions_total": 10,
+  "modeled_savings_total": 0.0,
+  "mapping_counts": {
+    "mapped": 3,
+    "needs_mapping": 2,
+    "non_catalog": 1
+  }
+}

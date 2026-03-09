@@ -1,0 +1,62 @@
+[
+  {
+    "task_type": "pricing_benchmark",
+    "status": "needs_research",
+    "item": "ABC1234",
+    "vendor": "Vendor A"
+  },
+  {
+    "task_type": "pricing_benchmark",
+    "status": "needs_research",
+    "item": "XYZ9876",
+    "vendor": "Vendor A"
+  },
+  {
+    "task_type": "pricing_benchmark",
+    "status": "needs_research",
+    "item": "LMN5555",
+    "vendor": "Vendor B"
+  },
+  {
+    "task_type": "pricing_benchmark",
+    "status": "skipped_non_catalog",
+    "item": "NC9999",
+    "vendor": "Vendor B"
+  },
+  {
+    "task_type": "pricing_benchmark",
+    "status": "needs_mapping",
+    "item": "AAA1111",
+    "vendor": "Vendor C"
+  },
+  {
+    "task_type": "pricing_benchmark",
+    "status": "needs_mapping",
+    "item": "BBB2222",
+    "vendor": "Vendor C"
+  },
+  {
+    "task_type": "alternate_part",
+    "status": "needs_research",
+    "item": "ABC1234",
+    "vendor": "Vendor A"
+  },
+  {
+    "task_type": "alternate_part",
+    "status": "needs_research",
+    "item": "XYZ9876",
+    "vendor": "Vendor A"
+  },
+  {
+    "task_type": "alternate_part",
+    "status": "needs_research",
+    "item": "LMN5555",
+    "vendor": "Vendor B"
+  },
+  {
+    "task_type": "alternate_part",
+    "status": "skipped_non_catalog",
+    "item": "NC9999",
+    "vendor": "Vendor B"
+  }
+]

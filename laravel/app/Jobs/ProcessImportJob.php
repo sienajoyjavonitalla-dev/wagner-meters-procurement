@@ -9,6 +9,7 @@ use App\Models\Mapping;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\VendorPriority;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,9 +31,10 @@ class ProcessImportJob implements ShouldQueue
         public ?string $mpnMapPath = null
     ) {}
 
-    public function handle(): void
+    public function handle(AuditLogService $auditLog): void
     {
         $import = $this->dataImport;
+        $auditLog->log('import.process.started', null, 'data_import', $import->id);
 
         try {
             $previousId = DataImport::where('type', 'full')
@@ -61,11 +63,17 @@ class ProcessImportJob implements ShouldQueue
                 'status' => 'completed',
                 'row_counts' => $rowCounts,
             ]);
+            $auditLog->log('import.process.completed', null, 'data_import', $import->id, [
+                'row_counts' => $rowCounts,
+            ]);
         } catch (\Throwable $e) {
             Log::error('ProcessImportJob failed: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $import->update([
                 'status' => 'failed',
                 'row_counts' => $import->row_counts ?? [],
+            ]);
+            $auditLog->log('import.process.failed', null, 'data_import', $import->id, [
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
@@ -205,19 +213,24 @@ class ProcessImportJob implements ShouldQueue
             $row = array_combine($headers, array_pad(array_slice($rows[$i], 0, count($headers)), count($headers), null));
             $internalPartNumber = trim((string) ($row['Item ID'] ?? ''));
             $mpn = trim((string) ($row['mpn'] ?? ''));
-            if ($internalPartNumber === '' || $mpn === '') {
+            $lookupMode = strtolower(trim((string) ($row['lookup_mode'] ?? '')));
+            $isNonCatalog = in_array($lookupMode, ['non_catalog', 'noncatalog', 'custom'], true);
+            if ($internalPartNumber === '') {
                 continue;
             }
             $itemId = $itemIdToDbId[$internalPartNumber] ?? null;
             if (! $itemId) {
                 continue;
             }
+            if ($mpn === '' && ! $isNonCatalog) {
+                continue;
+            }
             Mapping::create([
                 'item_id' => $itemId,
-                'mpn' => $mpn,
+                'mpn' => $mpn !== '' ? $mpn : 'NONCATALOG',
                 'manufacturer' => $row['manufacturer'] ?? null,
-                'mapping_status' => $row['mapping_status'] ?? 'mapped',
-                'lookup_mode' => $row['lookup_mode'] ?? null,
+                'mapping_status' => $isNonCatalog ? 'non_catalog' : ($row['mapping_status'] ?? 'mapped'),
+                'lookup_mode' => $isNonCatalog ? 'non_catalog' : ($row['lookup_mode'] ?? null),
                 'data_import_id' => $dataImportId,
             ]);
             $count++;

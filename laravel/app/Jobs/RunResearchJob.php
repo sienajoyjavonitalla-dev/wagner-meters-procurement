@@ -9,6 +9,8 @@ use App\Models\ResearchTask;
 use App\Services\ClaudeResearchService;
 use App\Services\DigiKeyClient;
 use App\Services\FxSnapshotService;
+use App\Services\AuditLogService;
+use App\Services\AppSettingsService;
 use App\Services\MappingService;
 use App\Services\MouserClient;
 use App\Services\NexarClient;
@@ -42,14 +44,21 @@ class RunResearchJob implements ShouldQueue
         MappingService $mappingService,
         PostProcessResearchService $postProcess,
         FxSnapshotService $fxSnapshot,
+        AppSettingsService $settings,
+        AuditLogService $auditLog,
     ): void {
         $run = $this->researchRunId ? ResearchRun::find($this->researchRunId) : null;
         if ($run) {
             $run->update(['status' => 'running', 'message' => 'Research job started.']);
         }
+        $auditLog->log('research.run.started', null, 'research_run', $run?->id, [
+            'batch_id' => $this->batchId,
+            'limit' => $this->limit,
+            'use_claude' => $this->useClaudeFallback,
+        ]);
 
         try {
-            $this->runResearch($digiKey, $mouser, $nexar, $claude, $mappingService);
+            $this->runResearch($digiKey, $mouser, $nexar, $claude, $mappingService, $settings);
             $actionsCount = $postProcess->process();
             $fxSnapshot->capture();
 
@@ -60,6 +69,9 @@ class RunResearchJob implements ShouldQueue
                     'completed_at' => now(),
                 ]);
             }
+            $auditLog->log('research.run.completed', null, 'research_run', $run?->id, [
+                'actions_upserted' => $actionsCount,
+            ]);
         } catch (Throwable $e) {
             if ($run) {
                 $run->update([
@@ -68,6 +80,9 @@ class RunResearchJob implements ShouldQueue
                     'completed_at' => now(),
                 ]);
             }
+            $auditLog->log('research.run.failed', null, 'research_run', $run?->id, [
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }
@@ -78,10 +93,12 @@ class RunResearchJob implements ShouldQueue
         NexarClient $nexar,
         ClaudeResearchService $claude,
         MappingService $mappingService,
+        AppSettingsService $settings,
     ): void {
-        $strictMapping = config('procurement.research.strict_mapping', true);
-        $minMatchScore = (float) config('procurement.research.min_match_score', 0.9);
-        $claudeBatchSize = (int) config('procurement.research.claude_batch_size', 50);
+        $researchSettings = $settings->getResearchSettings();
+        $strictMapping = (bool) ($researchSettings['strict_mapping'] ?? true);
+        $minMatchScore = (float) ($researchSettings['min_match_score'] ?? 0.9);
+        $claudeBatchSize = (int) ($researchSettings['claude_batch_size'] ?? 50);
 
         $query = ResearchTask::query()
             ->where('status', 'pending')

@@ -24,7 +24,6 @@ export default function Welcome() {
         </p>
         <div>
           <Link to="/login" style={linkButtonStyle}>Log in</Link>
-          <Link to="/register" style={linkStyle}>Register</Link>
         </div>
       </div>
     </div>

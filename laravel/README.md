@@ -1,83 +1,75 @@
-# Wagner Meters Procurement (Laravel)
+# Wagner Meters Procurement (Laravel + React)
 
-**Local setup (Phase 1.1):** Create the MySQL database and run migrations:
+Primary application for the procurement research workflow.
+
+## Local Setup
+
+1. Create/update database and migrate:
 
 ```bash
-# From Laragon (or any MySQL): create database wagner_meters_procurement;
 cd laravel
 php artisan migrate
 ```
 
-`.env` is already set for MySQL (`DB_DATABASE=wagner_meters_procurement`, `DB_USERNAME=root`, `DB_PASSWORD=`). Adjust if your MySQL differs. Queue driver is `database`.
+2. Install frontend dependencies and run Vite:
 
-**Auth (Phase 1.5):** Laravel Breeze is installed. Register a user at `/register` or run `php artisan db:seed` if you add a seeder. The **Data Import** page (`/data-import`) requires login.
+```bash
+npm install
+npm run dev
+```
 
-**One-time CLI import:** Run a full snapshot import from local files without using the UI:
+3. Start Laravel (if not using Laragon virtual host):
+
+```bash
+php artisan serve
+```
+
+## Authentication
+
+- Register/login through `/register` and `/login`
+- Protected views require auth:
+  - `/dashboard`
+  - `/data-import`
+  - `/profile`
+
+## Data Import
+
+Use UI (`/data-import`) or CLI:
 
 ```bash
 php artisan procurement:import-files path/to/inventory.xlsx path/to/vendor_priority.csv path/to/item_spread.csv --mpn-map=path/to/mpn_map.csv
 ```
 
-Paths can be absolute or relative to the project root. Optional `--mpn-map` can be omitted.
+## Research Pipeline Commands
 
----
+```bash
+php artisan procurement:build-queue --vendors=20 --per-vendor=50 --spread=100
+php artisan procurement:run-research --limit=500 --sync
+```
 
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Optional flags:
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+- `--build` (on `procurement:run-research`) to build queue first
+- `--no-claude` to disable Claude fallback
+- `--batch=<uuid>` to run a specific batch
 
-## About Laravel
+## Environment Variables (Provider Keys)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Configured via `config/procurement.php`:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- DigiKey: `DIGIKEY_CLIENT_ID`, `DIGIKEY_CLIENT_SECRET`
+- Mouser: `MOUSER_API_KEY` (or `MOUSER_SEARCH_API_KEY`)
+- Nexar: `NEXAR_CLIENT_ID`, `NEXAR_CLIENT_SECRET`
+- Claude: `ANTHROPIC_API_KEY`
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Research behavior:
 
-## Learning Laravel
+- `PROCUREMENT_STRICT_MAPPING` (default true)
+- `PROCUREMENT_MIN_MATCH_SCORE` (default 0.9)
+- `PROCUREMENT_CLAUDE_BATCH_SIZE` (default 50)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Phase 5 Operations
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Validation report: `../phase5_1/PHASE_5_1_VALIDATION_REPORT.md`
+- Cutover checklist: `../phase5_2/CUTOVER_CHECKLIST.md`
+- Stakeholder sign-off: `../phase5_2/STAKEHOLDER_SIGNOFF.md`

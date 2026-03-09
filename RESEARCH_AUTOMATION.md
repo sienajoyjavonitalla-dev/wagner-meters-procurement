@@ -1,5 +1,9 @@
 # Procurement Research Automation
 
+> Note: This document describes the legacy Python/Streamlit workflow.
+> The primary production workflow is now Laravel + React (`laravel/`).
+> For cutover operations, use `phase5_2/CUTOVER_CHECKLIST.md`.
+
 This workflow automates two research tracks:
 
 - Pricing research: benchmark current unit prices vs distributor/API findings.
@@ -170,3 +174,20 @@ Dashboard source:
 - Filter `status == researched` and `estimated_savings > 0`.
 - Treat `needs_research` rows as next batch for deeper agent/manual work.
 - Keep human approval before supplier outreach or part substitutions.
+
+## Laravel Cutover Commands (Phase 5.2)
+
+Use these commands during cutover when switching to Laravel:
+
+```bash
+cd laravel
+php artisan procurement:import-files <inventory.xlsx> <vendor_priority.csv> <item_spread.csv> --mpn-map=<mpn_map.csv>
+php artisan procurement:build-queue --vendors=20 --per-vendor=50 --spread=100
+php artisan procurement:run-research --limit=500 --sync
+```
+
+Then verify:
+
+- `/dashboard`
+- `/dashboard/run-controls`
+- `/api/procurement/run-status?latest=1`

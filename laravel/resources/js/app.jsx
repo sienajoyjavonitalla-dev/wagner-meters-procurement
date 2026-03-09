@@ -6,9 +6,16 @@ import AuthenticatedLayout from './layouts/AuthenticatedLayout';
 import Dashboard from './pages/Dashboard';
 import DataImport from './pages/DataImport';
 import Profile from './pages/Profile';
+import ResearchQueue from './pages/ResearchQueue';
+import PriceComparison from './pages/PriceComparison';
+import ResearchEvidence from './pages/ResearchEvidence';
+import VendorProgress from './pages/VendorProgress';
+import MappingReview from './pages/MappingReview';
+import RunControls from './pages/RunControls';
+import BeginnerGuide from './pages/BeginnerGuide';
+import Users from './pages/Users';
 import Welcome from './pages/Welcome';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
@@ -25,7 +32,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="login" element={<Login />} />
-        <Route path="register" element={<Register />} />
         <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password/:token" element={<ResetPassword />} />
         <Route path="verify-email" element={<VerifyEmail />} />
@@ -34,26 +40,20 @@ function App() {
           <Route path="*" element={<AuthenticatedLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="dashboard/research-queue" element={<Placeholder title="Research Queue" />} />
-            <Route path="dashboard/price-comparison" element={<Placeholder title="Price Comparison" />} />
-            <Route path="dashboard/vendor-progress" element={<Placeholder title="Vendor Progress" />} />
-            <Route path="dashboard/mapping-review" element={<Placeholder title="Mapping Review" />} />
-            <Route path="dashboard/run-controls" element={<Placeholder title="Run Controls" />} />
+            <Route path="dashboard/research-queue" element={<ResearchQueue />} />
+            <Route path="dashboard/price-comparison" element={<PriceComparison />} />
+            <Route path="dashboard/research-evidence" element={<ResearchEvidence />} />
+            <Route path="dashboard/vendor-progress" element={<VendorProgress />} />
+            <Route path="dashboard/mapping-review" element={<MappingReview />} />
+            <Route path="dashboard/run-controls" element={<RunControls />} />
+            <Route path="dashboard/how-to-use" element={<BeginnerGuide />} />
+            <Route path="dashboard/users" element={<Users />} />
             <Route path="data-import" element={<DataImport />} />
             <Route path="profile" element={<Profile />} />
           </Route>
         </Route>
       </Routes>
     </BrowserRouter>
-  );
-}
-
-function Placeholder({ title }) {
-  return (
-    <div className="app-main-inner" style={{ padding: '1.5rem' }}>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#e6edf3' }}>{title}</h1>
-      <p style={{ color: '#8b949e' }}>View coming in Phase 4.2.</p>
-    </div>
   );
 }
 

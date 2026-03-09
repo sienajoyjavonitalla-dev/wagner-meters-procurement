@@ -61,9 +61,16 @@ export default function BeginnerGuide() {
 
       <div style={stepStyle}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>5) Work through operational views</h3>
-        <p style={{ color: '#8b949e', margin: 0 }}>
+        <p style={{ color: '#8b949e', margin: '0 0 0.5rem' }}>
           Use <strong>Research Queue</strong>, <strong>Price Comparison</strong>, <strong>Research Evidence</strong>, <strong>Vendor Progress</strong>, and <strong>Mapping Review</strong> for follow-up actions.
         </p>
+        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
+          <li><strong>Research Queue</strong>: monitor queued tasks and track processing backlog.</li>
+          <li><strong>Price Comparison</strong>: compare current cost vs best price and review estimated savings.</li>
+          <li><strong>Research Evidence</strong>: verify recommendation proof (provider, matched MPN, score, price).</li>
+          <li><strong>Vendor Progress</strong>: track completion by supplier and prioritize follow-up.</li>
+          <li><strong>Mapping Review</strong>: fix missing/weak mappings to improve research quality.</li>
+        </ol>
       </div>
 
       <div style={stepStyle}>

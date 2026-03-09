@@ -25,5 +25,3 @@ export default function ChartContainer({ title, children, style = {} }) {
     </div>
   );
 }
-
-export { chartTheme, chartColors } from '../../theme/chartTheme';

@@ -62,7 +62,7 @@ export default function Profile() {
       <div style={{ maxWidth: '42rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={boxStyle}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#e6edf3', marginBottom: '0.5rem' }}>Profile Information</h2>
-          <p style={{ fontSize: '0.875rem', color: '#8b949e', marginBottom: '1rem' }}>Update your account's profile information and email address.</p>
+          <p style={{ fontSize: '0.875rem', color: '#8b949e', marginBottom: '1rem' }}>Update your account&apos;s profile information and email address.</p>
           <form onSubmit={handleSubmit}>
             <input type="hidden" name="_token" value={getCsrfToken()} />
             <div style={{ marginBottom: '1rem' }}>

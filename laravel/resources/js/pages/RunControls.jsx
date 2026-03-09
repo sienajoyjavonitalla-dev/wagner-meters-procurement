@@ -45,20 +45,21 @@ export default function RunControls() {
     }).catch(() => setSettings(null));
   }, []);
 
-  // Load latest run status on mount and when runId is set
+  // Load latest run status on mount
   useEffect(() => {
-    if (!runId && !status) {
-      apiGet(API_STATUS + '?latest=1').then((s) => setStatus(s)).catch(() => setStatus(null));
-      return;
-    }
-    if (!runId) return;
+    if (runId) return;
+    apiGet(API_STATUS + '?latest=1').then((s) => setStatus(s)).catch(() => setStatus(null));
+  }, [runId]);
+
+  // Poll status while a run is active
+  useEffect(() => {
+    if (!runId || !polling) return;
     let cancelled = false;
     const poll = () => {
       apiGet(`${API_STATUS}?run_id=${runId}`)
         .then((s) => {
           if (!cancelled) setStatus(s);
-          if (!cancelled && s.status !== 'pending' && s.status !== 'running') return;
-          if (!cancelled && polling) setTimeout(poll, 2000);
+          if (!cancelled && (s.status === 'pending' || s.status === 'running')) setTimeout(poll, 2000);
         })
         .catch(() => {
           if (!cancelled) setPolling(false);
@@ -66,7 +67,7 @@ export default function RunControls() {
     };
     poll();
     return () => { cancelled = true; };
-  }, [runId]);
+  }, [runId, polling]);
 
   // When status is completed/failed, stop polling
   useEffect(() => {

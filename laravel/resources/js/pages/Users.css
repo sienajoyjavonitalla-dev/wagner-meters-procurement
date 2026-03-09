@@ -1,0 +1,36 @@
+.employees-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.employees-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.employees-btn--create:hover:not(:disabled) {
+  background: #2ea043 !important;
+  border-color: #3fb950 !important;
+}
+
+.employees-btn--edit:hover:not(:disabled) {
+  background: rgba(46, 160, 67, 0.12) !important;
+  border-color: #3fb950 !important;
+  color: #7ee787 !important;
+}
+
+.employees-btn--delete:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.14) !important;
+  border-color: #ff7b72 !important;
+  color: #ff7b72 !important;
+}
+
+.employees-btn--save:hover:not(:disabled) {
+  background: #388bfd !important;
+  border-color: #58a6ff !important;
+}
+
+.employees-btn--cancel:hover:not(:disabled) {
+  background: rgba(240, 246, 252, 0.08) !important;
+  border-color: #8b949e !important;
+  color: #f0f6fc !important;
+}

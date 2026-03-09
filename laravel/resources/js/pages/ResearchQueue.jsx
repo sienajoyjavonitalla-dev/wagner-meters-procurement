@@ -3,6 +3,14 @@ import { apiGet } from '../api';
 
 const API = '/api/procurement/queue';
 
+function BtnIcon({ children }) {
+  return (
+    <span className="employees-btn-icon" aria-hidden="true" style={{ width: 16, height: 16, display: 'inline-flex', marginRight: '0.35rem' }}>
+      {children}
+    </span>
+  );
+}
+
 export default function ResearchQueue() {
   const [result, setResult] = useState({ data: [], meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 } });
   const [loading, setLoading] = useState(true);
@@ -97,14 +105,22 @@ export default function ResearchQueue() {
           onClick={() => setPage(1)}
           style={{
             padding: '0.35rem 0.75rem',
-            background: '#21262d',
-            border: '1px solid #30363d',
+            background: '#1f6feb',
+            border: '1px solid #388bfd',
             borderRadius: 6,
-            color: '#e6edf3',
+            color: '#fff',
             cursor: 'pointer',
             fontSize: '0.875rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            lineHeight: 1,
           }}
         >
+          <BtnIcon>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+          </BtnIcon>
           Apply
         </button>
       </div>

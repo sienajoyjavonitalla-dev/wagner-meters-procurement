@@ -33,7 +33,9 @@ export default function AuthenticatedLayout() {
               <path d="M6.168 18.849A4 4 0 0 1 10 16h4a4 4 0 0 1 3.834 2.855" />
             </svg>
           </NavIcon>
-          <span className="app-nav-profile-name">{displayName}</span>
+          <NavLink to="/profile" className="app-nav-profile-name">
+            {displayName}
+          </NavLink>
         </div>
 
         <nav className="app-nav-links">
@@ -130,16 +132,6 @@ export default function AuthenticatedLayout() {
               Users
             </NavLink>
           )}
-          <NavLink to="/profile" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
-            <NavIcon>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                <path d="M6.168 18.849A4 4 0 0 1 10 16h4a4 4 0 0 1 3.834 2.855" />
-              </svg>
-            </NavIcon>
-            Profile
-          </NavLink>
         </nav>
         <NavLink to="/dashboard/how-to-use" className={({ isActive }) => `app-nav-link app-nav-guide-link ${isActive ? 'active' : ''}`} end>
           <NavIcon>

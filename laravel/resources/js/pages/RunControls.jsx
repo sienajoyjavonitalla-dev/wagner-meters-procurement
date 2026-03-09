@@ -5,6 +5,14 @@ const API_RUN = '/api/procurement/run';
 const API_STATUS = '/api/procurement/run-status';
 const API_SETTINGS = '/api/procurement/settings';
 
+function BtnIcon({ children }) {
+  return (
+    <span className="employees-btn-icon" aria-hidden="true" style={{ width: 16, height: 16, display: 'inline-flex', marginRight: '0.35rem' }}>
+      {children}
+    </span>
+  );
+}
+
 function formatTime(iso) {
   if (!iso) return '—';
   try {
@@ -167,7 +175,14 @@ export default function RunControls() {
                 Nightly time
                 <input type="time" disabled={!isAdmin} value={settings.nightly_time} onChange={(e) => setSettings((s) => ({ ...s, nightly_time: e.target.value }))} style={{ marginLeft: '0.5rem', padding: '0.35rem 0.5rem', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3' }} />
               </label>
-              <button type="button" onClick={handleSaveSettings} disabled={!isAdmin || settingsSaving} style={{ padding: '0.35rem 0.75rem', background: !isAdmin || settingsSaving ? '#30363d' : '#1f6feb', border: `1px solid ${!isAdmin || settingsSaving ? '#30363d' : '#388bfd'}`, borderRadius: 6, color: '#fff', cursor: !isAdmin || settingsSaving ? 'not-allowed' : 'pointer', fontSize: '0.875rem' }}>
+              <button type="button" onClick={handleSaveSettings} disabled={!isAdmin || settingsSaving} style={{ padding: '0.35rem 0.75rem', background: !isAdmin || settingsSaving ? '#30363d' : '#1f6feb', border: `1px solid ${!isAdmin || settingsSaving ? '#30363d' : '#388bfd'}`, borderRadius: 6, color: '#fff', cursor: !isAdmin || settingsSaving ? 'not-allowed' : 'pointer', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}>
+                <BtnIcon>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                </BtnIcon>
                 {settingsSaving ? 'Saving…' : 'Save settings'}
               </button>
             </div>
@@ -234,8 +249,16 @@ export default function RunControls() {
               color: '#fff',
               cursor: (triggering || !isAdmin) ? 'not-allowed' : 'pointer',
               fontSize: '0.875rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: 1,
             }}
           >
+            <BtnIcon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            </BtnIcon>
             {triggering ? 'Starting…' : 'Start run'}
           </button>
         </div>

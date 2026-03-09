@@ -13,6 +13,14 @@ const inputStyle = {
 const labelStyle = { display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#e6edf3', marginBottom: '0.375rem' };
 const hintStyle = { fontSize: '0.75rem', color: '#8b949e', marginTop: '0.25rem' };
 
+function BtnIcon({ children }) {
+  return (
+    <span className="employees-btn-icon" aria-hidden="true" style={{ width: 16, height: 16, display: 'inline-flex', marginRight: '0.35rem' }}>
+      {children}
+    </span>
+  );
+}
+
 export default function DataImport() {
   const [success, setSuccess] = useState(null);
   const [errors, setErrors] = useState([]);
@@ -87,8 +95,15 @@ export default function DataImport() {
           <button
             type="submit"
             disabled={submitting}
-            style={{ alignSelf: 'flex-start', padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: '#fff', background: '#238636', border: '1px solid #2ea043', borderRadius: 6, cursor: submitting ? 'wait' : 'pointer' }}
+            style={{ alignSelf: 'flex-start', padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: '#fff', background: '#238636', border: '1px solid #2ea043', borderRadius: 6, cursor: submitting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', lineHeight: 1 }}
           >
+            <BtnIcon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 5 17 10" />
+                <line x1="12" y1="5" x2="12" y2="16" />
+              </svg>
+            </BtnIcon>
             {submitting ? 'Uploading…' : 'Upload and import'}
           </button>
         </form>

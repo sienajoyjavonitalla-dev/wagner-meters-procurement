@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ProcurementController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 // These endpoints are consumed by the React SPA using the same session cookie as the web app.
@@ -15,13 +16,13 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/procurement/mapping-review', [ProcurementController::class, 'mappingReview']);
     Route::get('/procurement/system-health', [ProcurementController::class, 'systemHealth']);
     Route::get('/procurement/settings', [ProcurementController::class, 'settings']);
-    Route::get('/procurement/users', [ProcurementController::class, 'users'])->middleware('can:manage-users');
-    Route::post('/procurement/users', [ProcurementController::class, 'createUser'])->middleware('can:manage-users');
-    Route::patch('/procurement/users/{user}', [ProcurementController::class, 'updateUser'])->middleware('can:manage-users');
-    Route::delete('/procurement/users/{user}', [ProcurementController::class, 'deleteUser'])->middleware('can:manage-users');
+    Route::get('/procurement/users', [UserController::class, 'index'])->middleware('can:manage-users');
+    Route::post('/procurement/users', [UserController::class, 'store'])->middleware('can:manage-users');
+    Route::patch('/procurement/users/{user}', [UserController::class, 'update'])->middleware('can:manage-users');
+    Route::delete('/procurement/users/{user}', [UserController::class, 'destroy'])->middleware('can:manage-users');
 
     Route::post('/procurement/run', [ProcurementController::class, 'triggerRun'])->middleware('can:manage-procurement');
     Route::post('/procurement/settings', [ProcurementController::class, 'updateSettings'])->middleware('can:manage-procurement');
-    Route::patch('/procurement/users/{user}/role', [ProcurementController::class, 'updateUserRole'])->middleware('can:manage-users');
+    Route::patch('/procurement/users/{user}/role', [UserController::class, 'updateRole'])->middleware('can:manage-users');
     Route::get('/procurement/run-status', [ProcurementController::class, 'runStatus']);
 });

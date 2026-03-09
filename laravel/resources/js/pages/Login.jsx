@@ -31,24 +31,18 @@ export default function Login() {
     formData.set('password', password);
     if (remember) formData.set('remember', '1');
     const result = await apiPostAuth('/login', formData);
-    console.log('[Login] apiPostAuth result:', result);
     setSubmitting(false);
     if (result.redirect) {
-      console.log('[Login] result.redirect is true, returning (redirect should happen in apiPostAuth)');
       return;
     }
     if (!result.ok) {
-      console.log('[Login] result not ok, setting errors');
       setErrors(result.errors || { email: result.message ? [result.message] : [] });
       return;
     }
     if (result.ok) {
       const base = apiBase().replace(/\/$/, '');
       const dashboardUrl = base + '/dashboard';
-      console.log('[Login] result.ok, redirecting to', dashboardUrl);
       window.location.href = dashboardUrl;
-    } else {
-      console.log('[Login] no redirect branch matched, result:', result);
     }
   }
 

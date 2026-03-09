@@ -206,6 +206,23 @@ export default function BeginnerGuide() {
       <div style={stepStyle}>
         <h3 style={headingRowStyle}>
           <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          Users
+        </h3>
+        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
+          <li>Open this page as <strong>super admin</strong> to manage user access.</li>
+          <li>Create users and assign the correct role (Super Admin, Admin, or Viewer).</li>
+          <li>Use Edit to update profile details or role, and Delete to remove inactive accounts.</li>
+        </ol>
+      </div>
+
+      <div style={stepStyle}>
+        <h3 style={headingRowStyle}>
+          <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <path d="M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
             <path d="M6.168 18.849A4 4 0 0 1 10 16h4a4 4 0 0 1 3.834 2.855" />

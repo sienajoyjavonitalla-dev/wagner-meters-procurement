@@ -115,42 +115,31 @@ export async function apiPostAuth(urlPath, formData) {
     headers,
   });
 
-  console.log('[apiPostAuth] response status:', res.status, 'ok:', res.ok, 'url:', urlPath);
-
   // status 0 often means opaque response (e.g. redirect with redirect:'manual') – treat as success and go to dashboard
   if (res.status === 0) {
     const dashboardUrl = base.replace(/\/$/, '') + '/dashboard';
-    console.log('[apiPostAuth] status 0 (opaque/redirect), redirecting to', dashboardUrl);
     window.location.href = dashboardUrl;
     return { redirect: true };
   }
 
   if (res.status === 302 || res.status === 303) {
     const dashboardUrl = base.replace(/\/$/, '') + '/dashboard';
-    console.log('[apiPostAuth] redirect branch 302/303 ->', dashboardUrl);
     window.location.href = dashboardUrl;
     return { redirect: true };
   }
 
-  const data = await res.json().catch((err) => {
-    console.log('[apiPostAuth] JSON parse failed:', err);
-    return {};
-  });
-  console.log('[apiPostAuth] response data:', data);
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    console.log('[apiPostAuth] not ok, returning errors');
     return { ok: false, errors: data.errors || {}, message: data.message };
   }
   // Laravel may return 200 with redirect URL when Accept: application/json
   if (res.ok && (data.redirect || data.url)) {
     const target = data.redirect || data.url;
     const finalUrl = target.startsWith('http') ? target : (base.replace(/\/$/, '') + (target.startsWith('/') ? target : '/' + target));
-    console.log('[apiPostAuth] redirect from body ->', finalUrl);
     window.location.href = finalUrl;
     return { redirect: true };
   }
-  console.log('[apiPostAuth] returning ok: true, no redirect in body');
   return { ok: true, data };
 }
 

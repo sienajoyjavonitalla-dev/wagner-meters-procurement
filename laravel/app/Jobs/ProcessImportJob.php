@@ -17,6 +17,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProcessImportJob implements ShouldQueue
@@ -52,11 +53,12 @@ class ProcessImportJob implements ShouldQueue
                 ItemSpread::where('data_import_id', $previousId)->delete();
             }
 
-            $rowCounts = $this->parseInventory(storage_path('app/'.$this->inventoryPath), $import->id);
-            $rowCounts['vendor_priorities'] = $this->parseVendorPriority(storage_path('app/'.$this->vendorPriorityPath), $import->id);
-            $rowCounts['item_spreads'] = $this->parseItemSpread(storage_path('app/'.$this->itemSpreadPath), $import->id);
+            $disk = Storage::disk('imports');
+            $rowCounts = $this->parseInventory($this->normalizePath($disk->path($this->inventoryPath)), $import->id);
+            $rowCounts['vendor_priorities'] = $this->parseVendorPriority($this->normalizePath($disk->path($this->vendorPriorityPath)), $import->id);
+            $rowCounts['item_spreads'] = $this->parseItemSpread($this->normalizePath($disk->path($this->itemSpreadPath)), $import->id);
             $rowCounts['mappings'] = $this->mpnMapPath
-                ? $this->parseMpnMap(storage_path('app/'.$this->mpnMapPath), $import->id)
+                ? $this->parseMpnMap($this->normalizePath($disk->path($this->mpnMapPath)), $import->id)
                 : 0;
 
             $import->update([
@@ -77,6 +79,11 @@ class ProcessImportJob implements ShouldQueue
             ]);
             throw $e;
         }
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return str_replace(['/', '\\'], [DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR], $path);
     }
 
     /** @return array{suppliers: int, items: int, purchases: int} */

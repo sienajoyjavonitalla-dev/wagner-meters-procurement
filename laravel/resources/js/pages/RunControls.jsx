@@ -209,6 +209,7 @@ export default function RunControls() {
               }}
             >
               <option value="claude">Claude</option>
+              <option value="codex">Codex</option>
               <option value="none">None (API only)</option>
             </select>
           </label>

@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark theme: make time input picker icon white */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}

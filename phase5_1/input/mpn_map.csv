@@ -1,7 +1,0 @@
-Item ID,mpn,lookup_mode,notes
-ABC1234,ABC1234,catalog_lookup,curated_high_confidence
-XYZ9876,XYZ9876,catalog_lookup,verified
-LMN5555,LMN5555,catalog_lookup,erp
-NC9999,,non_catalog,custom part
-AAA1111,,catalog_lookup,missing mapping
-BBB2222,,catalog_lookup,missing mapping

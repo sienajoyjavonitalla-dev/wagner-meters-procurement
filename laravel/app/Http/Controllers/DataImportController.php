@@ -7,6 +7,7 @@ use App\Jobs\ProcessImportJob;
 use App\Models\DataImport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class DataImportController extends Controller
@@ -21,11 +22,12 @@ class DataImportController extends Controller
     public function store(StoreDataImportRequest $request): RedirectResponse|JsonResponse
     {
         $dir = 'imports/'.uniqid('run_', true);
-        $inventoryPath = $request->file('inventory')->storeAs($dir, 'inventory.'.$request->file('inventory')->getClientOriginalExtension());
-        $vendorPriorityPath = $request->file('vendor_priority')->storeAs($dir, 'vendor_priority.'.$request->file('vendor_priority')->getClientOriginalExtension());
-        $itemSpreadPath = $request->file('item_spread')->storeAs($dir, 'item_spread.'.$request->file('item_spread')->getClientOriginalExtension());
+        $disk = Storage::disk('imports');
+        $inventoryPath = $disk->putFileAs($dir, $request->file('inventory'), 'inventory.'.$request->file('inventory')->getClientOriginalExtension());
+        $vendorPriorityPath = $disk->putFileAs($dir, $request->file('vendor_priority'), 'vendor_priority.'.$request->file('vendor_priority')->getClientOriginalExtension());
+        $itemSpreadPath = $disk->putFileAs($dir, $request->file('item_spread'), 'item_spread.'.$request->file('item_spread')->getClientOriginalExtension());
         $mpnMapPath = $request->hasFile('mpn_map') && $request->file('mpn_map')->isValid()
-            ? $request->file('mpn_map')->storeAs($dir, 'mpn_map.'.$request->file('mpn_map')->getClientOriginalExtension())
+            ? $disk->putFileAs($dir, $request->file('mpn_map'), 'mpn_map.'.$request->file('mpn_map')->getClientOriginalExtension())
             : null;
 
         $import = DataImport::create([

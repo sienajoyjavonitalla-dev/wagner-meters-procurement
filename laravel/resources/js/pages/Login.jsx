@@ -49,7 +49,13 @@ export default function Login() {
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div style={cardStyle}>
-        <h1 style={titleStyle}>Log in</h1>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+          <img
+            src="/images/logo.png"
+            alt="Wagner Meters"
+            style={{ maxWidth: '260px', width: '100%', height: 'auto', objectFit: 'contain' }}
+          />
+        </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <label style={labelStyle}>Email</label>

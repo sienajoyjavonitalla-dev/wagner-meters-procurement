@@ -18,8 +18,9 @@ export const chartTheme = {
   tick: '#8b949e',
   grid: '#30363d',
   tooltip: {
-    contentStyle: { background: '#161b22', border: '1px solid #30363d', borderRadius: 6 },
+    contentStyle: { background: '#161b22', border: '1px solid #30363d', borderRadius: 6, color: '#ffffff' },
     labelStyle: { color: '#e6edf3' },
+    itemStyle: { color: '#ffffff' },
   },
   cartesianGrid: { stroke: '#30363d' },
   bar: { fill: '#58a6ff' },

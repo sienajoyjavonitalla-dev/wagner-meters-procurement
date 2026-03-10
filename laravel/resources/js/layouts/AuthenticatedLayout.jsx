@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { getDisplayName, isSuperAdminUser, logout } from '../api';
 import './AuthenticatedLayout.css';
@@ -12,6 +13,7 @@ export default function AuthenticatedLayout() {
   const navigate = useNavigate();
   const displayName = getDisplayName();
   const canManageUsers = isSuperAdminUser();
+  const [logoError, setLogoError] = useState(false);
 
   function handleLogout() {
     logout();
@@ -22,7 +24,14 @@ export default function AuthenticatedLayout() {
     <div className="authenticated-layout">
       <aside className="app-nav">
         <div className="app-nav-brand">
-          <span className="app-nav-logo-text">Procurement</span>
+          {!logoError && (
+            <img
+              src="/images/logo.png"
+              alt="Wagner"
+              className="app-nav-logo"
+              onError={() => setLogoError(true)}
+            />
+          )}
         </div>
 
         <div className="app-nav-profile">
@@ -91,11 +100,25 @@ export default function AuthenticatedLayout() {
           </NavLink>
           <NavLink to="/dashboard/vendor-progress" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
             <NavIcon>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10,35 L90,35 L80,15 L20,15 Z" />
+                <path d="M10,35 Q10,48 23.3,48 Q36.6,48 36.6,35 Q36.6,48 50,48 Q63.4,48 63.4,35 Q63.4,48 76.7,48 Q90,48 90,35" />
+                <line x1="36.6" y1="16" x2="36.6" y2="35" />
+                <line x1="63.4" y1="16" x2="63.4" y2="35" />
+
+                <line x1="18" y1="35" x2="18" y2="80" />
+                <line x1="82" y1="35" x2="82" y2="80" />
+
+                <rect x="10" y="82" width="80" height="8" rx="4" />
+
+                <circle cx="50" cy="58" r="8" />
+                <path d="M34,82 C34,70 66,70 66,82" />
+                <circle cx="41" cy="80" r="0.5" fill="black" stroke="none" />
+                <circle cx="59" cy="80" r="0.5" fill="black" stroke="none" />
+
+                <g transform="translate(71, 52)">
+                  <path d="M11,0 L22,6 L22,18 L11,24 L0,18 L0,6 Z" fill="white" />
+                  <path d="M11,0 L22,6 L11,12 L0,6 Z" /> <path d="M0,6 L11,12 L11,24 L0,18 Z" /> <path d="M11,12 L22,6 L22,18 L11,24 Z" /> </g>
               </svg>
             </NavIcon>
             Vendor Progress

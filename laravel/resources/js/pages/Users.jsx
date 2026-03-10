@@ -149,9 +149,6 @@ export default function Users() {
   return (
     <div className="app-main-inner" style={{ padding: '1.5rem' }}>
       <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#e6edf3' }}>Users</h1>
-      <p style={{ color: '#8b949e', marginBottom: '1rem' }}>
-        Manage user roles: Super Admin, Admin, and Viewer.
-      </p>
 
       {notice && (
         <div

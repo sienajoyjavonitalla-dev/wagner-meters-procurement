@@ -132,7 +132,7 @@ export default function Dashboard() {
                     <Cell key={i} fill={chartColors[i % chartColors.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={chartTheme.tooltip.contentStyle} labelStyle={chartTheme.tooltip.labelStyle} />
+                <Tooltip contentStyle={chartTheme.tooltip.contentStyle} labelStyle={chartTheme.tooltip.labelStyle} itemStyle={chartTheme.tooltip.itemStyle} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -146,7 +146,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.cartesianGrid.stroke} />
                 <XAxis dataKey="name" tick={{ fill: chartTheme.tick }} />
                 <YAxis tick={{ fill: chartTheme.tick }} />
-                <Tooltip contentStyle={chartTheme.tooltip.contentStyle} labelStyle={chartTheme.tooltip.labelStyle} />
+                <Tooltip contentStyle={chartTheme.tooltip.contentStyle} labelStyle={chartTheme.tooltip.labelStyle} itemStyle={chartTheme.tooltip.itemStyle} />
                 <Bar dataKey="count" fill={chartTheme.bar.fill} radius={[4, 4, 0, 0]} name="Hits" />
               </BarChart>
             </ResponsiveContainer>
@@ -164,7 +164,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.cartesianGrid.stroke} />
                 <XAxis dataKey="day" tick={{ fill: chartTheme.tick }} />
                 <YAxis tick={{ fill: chartTheme.tick }} />
-                <Tooltip contentStyle={chartTheme.tooltip.contentStyle} labelStyle={chartTheme.tooltip.labelStyle} />
+                <Tooltip contentStyle={chartTheme.tooltip.contentStyle} labelStyle={chartTheme.tooltip.labelStyle} itemStyle={chartTheme.tooltip.itemStyle} />
                 <Line type="monotone" dataKey="savings_total" stroke={chartTheme.line.stroke} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>

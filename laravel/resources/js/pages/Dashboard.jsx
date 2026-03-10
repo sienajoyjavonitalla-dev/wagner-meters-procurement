@@ -172,7 +172,7 @@ export default function Dashboard() {
             <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No savings trend data yet.</p>
           )}
         </ChartContainer>
-        <ChartContainer title="Top suppliers by modeled savings">
+        <ChartContainer title="Savings potential by current vendor">
           {topSuppliers.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e6edf3', fontSize: '0.875rem' }}>

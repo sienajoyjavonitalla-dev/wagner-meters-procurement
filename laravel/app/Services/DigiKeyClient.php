@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\DTO\PriceFindingData;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class DigiKeyClient
 {
@@ -34,6 +35,7 @@ class DigiKeyClient
     {
         $token = $this->getToken();
         if (! $token) {
+            Log::warning('DigiKey lookup skipped: failed to obtain access token.', ['mpn' => $queryMpn]);
             return [];
         }
 
@@ -48,6 +50,11 @@ class DigiKeyClient
             ->get($url);
 
         if ($response->failed()) {
+            Log::warning('DigiKey lookup failed.', [
+                'mpn' => $queryMpn,
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
             return [];
         }
 
@@ -96,6 +103,10 @@ class DigiKeyClient
             ]);
 
         if ($response->failed()) {
+            Log::warning('DigiKey token request failed.', [
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
             return null;
         }
 

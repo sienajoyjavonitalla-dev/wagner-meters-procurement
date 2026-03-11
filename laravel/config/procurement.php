@@ -38,10 +38,18 @@ return [
         'anthropic_version' => env('ANTHROPIC_VERSION', '2023-06-01'),
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        'max_output_tokens' => (int) env('GEMINI_MAX_OUTPUT_TOKENS', 2048),
+    ],
+
     'research' => [
         'strict_mapping' => (bool) env('PROCUREMENT_STRICT_MAPPING', true),
         'min_match_score' => (float) env('PROCUREMENT_MIN_MATCH_SCORE', 0.9),
         'claude_batch_size' => (int) env('PROCUREMENT_CLAUDE_BATCH_SIZE', 50),
+        'gemini_batch_size' => (int) env('PROCUREMENT_GEMINI_BATCH_SIZE', 50),
         'top_vendors' => (int) env('PROCUREMENT_TOP_VENDORS', 20),
         'items_per_vendor' => (int) env('PROCUREMENT_ITEMS_PER_VENDOR', 50),
         'top_spread_items' => (int) env('PROCUREMENT_TOP_SPREAD_ITEMS', 100),

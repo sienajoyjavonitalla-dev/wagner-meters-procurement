@@ -33,6 +33,7 @@ class Inventory extends Model
         'phone',
         'email',
         'research_completed_at',
+        'gemini_response_json',
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ class Inventory extends Model
             'unit_cost' => 'decimal:4',
             'ext_cost' => 'decimal:4',
             'research_completed_at' => 'datetime',
+            'gemini_response_json' => 'array',
         ];
     }
 

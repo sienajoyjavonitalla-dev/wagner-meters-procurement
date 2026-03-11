@@ -4,66 +4,39 @@ namespace App\Console\Commands;
 
 use App\Jobs\RunResearchJob;
 use App\Models\DataImport;
-use App\Services\AppSettingsService;
 use App\Services\AuditLogService;
-use App\Services\FxSnapshotService;
-use App\Services\MappingService;
-use App\Services\PostProcessResearchService;
-use App\Services\QueueBuilderService;
+use App\Services\GeminiResearchService;
 use Illuminate\Console\Command;
 
 class RunResearchCommand extends Command
 {
     protected $signature = 'procurement:run-research
-                            {--build : Build queue from latest import before running}
-                            {--batch= : Process only tasks with this batch_id (UUID)}
-                            {--limit=50 : Max pending tasks to process}
-                            {--no-claude : Disable Claude AI fallback}
-                            {--sync : Run research synchronously (default: dispatch job)}
-                            {--fx : Capture FX snapshot after run}';
+                            {--limit=50 : Max inventory rows to process (no research_completed_at)}
+                            {--sync : Run research synchronously (default: dispatch job)}';
 
-    protected $description = 'Run research pipeline: optionally build queue, process pending tasks, post-process actions, optional FX snapshot';
+    protected $description = 'Run research: process up to N inventory rows via Gemini (batch of rows not yet researched).';
 
-    public function handle(
-        QueueBuilderService $queueBuilder,
-        PostProcessResearchService $postProcess,
-        FxSnapshotService $fxSnapshot,
-    ): int {
+    public function handle(): int
+    {
         $import = DataImport::currentFull()->first();
         if (! $import) {
             $this->warn('No completed full import found. Run a data import first.');
             return self::FAILURE;
         }
 
-        if ($this->option('build')) {
-            $result = $queueBuilder->build($import);
-            $this->info("Queue built: {$result['created']} tasks (batch: {$result['batch_id']}).");
-        }
-
-        $batchId = $this->option('batch') ?: null;
-        $limit = (int) $this->option('limit');
-        $useClaude = ! $this->option('no-claude');
-
-        $job = new RunResearchJob($batchId, $limit, $useClaude);
+        $limit = max(1, min(500, (int) $this->option('limit')));
+        $job = new RunResearchJob($limit, null);
 
         if ($this->option('sync')) {
             $this->info('Running research synchronously...');
             $job->handle(
-                app(\App\Services\DigiKeyClient::class),
-                app(\App\Services\MouserClient::class),
-                app(\App\Services\NexarClient::class),
-                app(\App\Services\ClaudeResearchService::class),
-                app(MappingService::class),
-                $postProcess,
-                $fxSnapshot,
-                app(AppSettingsService::class),
+                app(GeminiResearchService::class),
                 app(AuditLogService::class),
             );
-            $this->info('Post-process and FX snapshot run by job.');
+            $this->info('Done.');
         } else {
             dispatch($job);
             $this->info('Research job dispatched. Process with: php artisan queue:work');
-            return self::SUCCESS;
         }
 
         return self::SUCCESS;

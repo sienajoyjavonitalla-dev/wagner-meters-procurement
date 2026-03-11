@@ -13,7 +13,6 @@ use App\Models\PriceFinding;
 use App\Models\ResearchRun;
 use App\Models\ResearchTask;
 use App\Services\DigiKeyClient;
-use App\Services\QueueBuilderService;
 use App\Services\MouserClient;
 use App\Services\NexarClient;
 use App\Services\ClaudeResearchService;
@@ -430,55 +429,35 @@ class ProcurementController extends Controller
     }
 
     /**
-     * 3.2.1 POST trigger research run
+     * 3.2.1 POST trigger research run (inventory-based, Gemini)
      */
-    public function triggerRun(
-        Request $request,
-        QueueBuilderService $queueBuilder,
-        AppSettingsService $settings,
-        AuditLogService $auditLog
-    ): JsonResponse
+    public function triggerRun(Request $request, AuditLogService $auditLog): JsonResponse
     {
         $import = DataImport::currentFull()->first();
         if (! $import) {
             return response()->json(['error' => 'No completed full import found. Run a data import first.'], 422);
         }
 
-        $build = (bool) $request->input('build', false);
-        $agentFallback = strtolower(trim((string) $request->input('agent_fallback', 'claude')));
         $batchSize = (int) $request->input('batch_size', 50);
         $batchSize = max(1, min($batchSize, 500));
-        $configured = $settings->getResearchSettings();
-
-        $batchId = null;
-        if ($build) {
-            $queueBuilder
-                ->setTopVendors((int) ($configured['top_vendors'] ?? 20))
-                ->setItemsPerVendor((int) ($configured['items_per_vendor'] ?? 50))
-                ->setTopSpreadItems((int) ($configured['top_spread_items'] ?? 100));
-            $result = $queueBuilder->build($import);
-            $batchId = $result['batch_id'] ?: null;
-        }
 
         $run = ResearchRun::create([
             'status' => 'pending',
-            'batch_id' => $batchId,
+            'batch_id' => null,
             'limit' => $batchSize,
-            'use_claude' => $agentFallback === 'claude',
-            'build_queue' => $build,
+            'use_claude' => false,
+            'use_gemini' => true,
+            'build_queue' => false,
             'message' => 'Job queued.',
         ]);
 
-        dispatch(new RunResearchJob($batchId, $batchSize, $run->use_claude, $run->id));
+        dispatch(new RunResearchJob($batchSize, $run->id));
 
         $auditLog->log('research.run.queued', $request->user()?->id, 'research_run', $run->id, [
-            'build_queue' => $build,
             'batch_size' => $batchSize,
-            'agent_fallback' => $agentFallback,
-            'batch_id' => $batchId,
         ]);
 
-        $statusUrl = url('/api/procurement/run-status?run_id=' . $run->id);
+        $statusUrl = url('/api/procurement/run-status?run_id='.$run->id);
 
         return response()->json([
             'run_id' => $run->id,

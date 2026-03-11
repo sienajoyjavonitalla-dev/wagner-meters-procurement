@@ -11,8 +11,10 @@ class ResearchRun extends Model
         'batch_id',
         'limit',
         'use_claude',
+        'use_gemini',
         'build_queue',
         'message',
+        'gemini_hits',
         'completed_at',
     ];
 
@@ -20,6 +22,7 @@ class ResearchRun extends Model
     {
         return [
             'use_claude' => 'boolean',
+            'use_gemini' => 'boolean',
             'build_queue' => 'boolean',
             'completed_at' => 'datetime',
         ];

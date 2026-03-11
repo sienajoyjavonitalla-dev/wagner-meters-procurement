@@ -66,4 +66,9 @@ class DataImport extends Model
     {
         return $this->hasMany(ItemSpread::class, 'data_import_id');
     }
+
+    public function inventories(): HasMany
+    {
+        return $this->hasMany(Inventory::class, 'data_import_id');
+    }
 }

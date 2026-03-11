@@ -6,65 +6,40 @@ use App\Jobs\ProcessImportJob;
 use App\Models\DataImport;
 use App\Services\AuditLogService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 class ProcurementImportFiles extends Command
 {
     protected $signature = 'procurement:import-files
-                            {inventory : Path to inventory Excel file}
-                            {vendor_priority : Path to vendor priority CSV/Excel}
-                            {item_spread : Path to item spread CSV/Excel}
-                            {--mpn-map= : Optional path to MPN map CSV/Excel}';
+                            {inventory : Path to inventory Excel/CSV file (columns A–V + Mfg Part Number 1–5)}';
 
-    protected $description = 'One-time import: load inventory, vendor priority, item spread, and optional MPN map from local paths (snapshot: replaces previous full import).';
+    protected $description = 'Import inventory file from local path. Populates inventories and mpn tables (replaces previous full import).';
 
     public function handle(AuditLogService $auditLog): int
     {
         $inventory = $this->argument('inventory');
-        $vendorPriority = $this->argument('vendor_priority');
-        $itemSpread = $this->argument('item_spread');
-        $mpnMap = $this->option('mpn-map');
-
-        foreach (['inventory' => $inventory, 'vendor_priority' => $vendorPriority, 'item_spread' => $itemSpread] as $name => $path) {
-            $resolved = $this->resolvePath($path);
-            if (! is_file($resolved)) {
-                $this->error("File not found ({$name}): {$path}");
-                return self::FAILURE;
-            }
-        }
-        if ($mpnMap !== null && $mpnMap !== '') {
-            $resolved = $this->resolvePath($mpnMap);
-            if (! is_file($resolved)) {
-                $this->error('File not found (mpn-map): '.$mpnMap);
-                return self::FAILURE;
-            }
+        $resolved = $this->resolvePath($inventory);
+        if (! is_file($resolved)) {
+            $this->error("File not found: {$inventory}");
+            return self::FAILURE;
         }
 
         $dir = 'imports/cli_'.now()->format('Y-m-d_His');
-        $inventoryPath = $dir.'/inventory.'.$this->extension($inventory);
-        $vendorPriorityPath = $dir.'/vendor_priority.'.$this->extension($vendorPriority);
-        $itemSpreadPath = $dir.'/item_spread.'.$this->extension($itemSpread);
-        $mpnMapPath = $mpnMap ? $dir.'/mpn_map.'.$this->extension($mpnMap) : null;
+        $ext = $this->extension($inventory);
+        $inventoryPath = $dir.'/inventory.'.$ext;
 
-        $this->info('Copying files into storage...');
-        Storage::makeDirectory($dir);
-        File::ensureDirectoryExists(dirname(storage_path('app/'.$inventoryPath)));
-        copy($this->resolvePath($inventory), storage_path('app/'.$inventoryPath));
-        copy($this->resolvePath($vendorPriority), storage_path('app/'.$vendorPriorityPath));
-        copy($this->resolvePath($itemSpread), storage_path('app/'.$itemSpreadPath));
-        if ($mpnMapPath !== null) {
-            copy($this->resolvePath($mpnMap), storage_path('app/'.$mpnMapPath));
-        }
+        $this->info('Copying file into storage...');
+        Storage::disk('imports')->makeDirectory($dir);
+        $fullPath = Storage::disk('imports')->path($inventoryPath);
+        File::ensureDirectoryExists(dirname($fullPath));
+        copy($resolved, $fullPath);
 
         $import = DataImport::create([
             'type' => 'full',
             'user_id' => null,
             'file_names' => [
                 'inventory' => basename($inventory),
-                'vendor_priority' => basename($vendorPriority),
-                'item_spread' => basename($itemSpread),
-                'mpn_map' => $mpnMap ? basename($mpnMap) : null,
             ],
             'row_counts' => [],
             'status' => 'pending',
@@ -74,7 +49,7 @@ class ProcurementImportFiles extends Command
         ]);
 
         $this->info('Running import (sync)...');
-        ProcessImportJob::dispatchSync($import, $inventoryPath, $vendorPriorityPath, $itemSpreadPath, $mpnMapPath);
+        ProcessImportJob::dispatchSync($import, $inventoryPath);
 
         $import->refresh();
         if ($import->status === 'completed') {

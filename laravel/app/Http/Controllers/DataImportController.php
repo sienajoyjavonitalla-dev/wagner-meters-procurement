@@ -23,27 +23,21 @@ class DataImportController extends Controller
     {
         $dir = 'imports/'.uniqid('run_', true);
         $disk = Storage::disk('imports');
-        $inventoryPath = $disk->putFileAs($dir, $request->file('inventory'), 'inventory.'.$request->file('inventory')->getClientOriginalExtension());
-        $vendorPriorityPath = $disk->putFileAs($dir, $request->file('vendor_priority'), 'vendor_priority.'.$request->file('vendor_priority')->getClientOriginalExtension());
-        $itemSpreadPath = $disk->putFileAs($dir, $request->file('item_spread'), 'item_spread.'.$request->file('item_spread')->getClientOriginalExtension());
-        $mpnMapPath = $request->hasFile('mpn_map') && $request->file('mpn_map')->isValid()
-            ? $disk->putFileAs($dir, $request->file('mpn_map'), 'mpn_map.'.$request->file('mpn_map')->getClientOriginalExtension())
-            : null;
+        $file = $request->file('inventory');
+        $extension = $file->getClientOriginalExtension();
+        $inventoryPath = $disk->putFileAs($dir, $file, 'inventory.'.$extension);
 
         $import = DataImport::create([
             'type' => 'full',
             'user_id' => $request->user()?->id,
             'file_names' => [
-                'inventory' => $request->file('inventory')->getClientOriginalName(),
-                'vendor_priority' => $request->file('vendor_priority')->getClientOriginalName(),
-                'item_spread' => $request->file('item_spread')->getClientOriginalName(),
-                'mpn_map' => $mpnMapPath ? $request->file('mpn_map')->getClientOriginalName() : null,
+                'inventory' => $file->getClientOriginalName(),
             ],
             'row_counts' => [],
             'status' => 'pending',
         ]);
 
-        ProcessImportJob::dispatch($import, $inventoryPath, $vendorPriorityPath, $itemSpreadPath, $mpnMapPath);
+        ProcessImportJob::dispatch($import, $inventoryPath);
 
         $message = 'Import queued. Refresh the page in a moment to see status.';
         if ($request->wantsJson()) {

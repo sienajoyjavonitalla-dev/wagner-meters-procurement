@@ -5,7 +5,7 @@
 @section('content')
 <div class="app-main-inner" style="padding: 1.5rem 2rem;">
     <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #e6edf3;">Data Import</h1>
-    <p style="color: #8b949e; margin-bottom: 1.5rem; font-size: 0.9375rem;">Upload inventory, vendor priority, item spread, and optional MPN map. This replaces the previous snapshot.</p>
+    <p style="color: #8b949e; margin-bottom: 1.5rem; font-size: 0.9375rem;">Upload a single inventory file (Excel or CSV). Columns A–V are stored as inventory rows; Mfg Part Number 1–5 (W–AA) are stored as MPNs. This replaces the previous import.</p>
 
     @if (session('success'))
         <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 6px; background: rgba(46, 160, 67, 0.15); color: #3fb950; font-size: 0.875rem;">{{ session('success') }}</div>
@@ -22,28 +22,10 @@
         <form action="{{ route('data-import.store') }}" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 1.25rem;">
             @csrf
             <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #e6edf3; margin-bottom: 0.375rem;">Inventory (Excel) *</label>
-                <input type="file" name="inventory" accept=".xlsx,.xls" required
+                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #e6edf3; margin-bottom: 0.375rem;">Inventory (Excel/CSV) *</label>
+                <input type="file" name="inventory" accept=".xlsx,.xls,.csv" required
                     style="width: 100%; padding: 0.5rem; font-size: 0.875rem; color: #e6edf3; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
-                <p style="font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem;">Required columns: Transaction Date, Vendor Name, Item ID, Description, Ext. Cost, Unit Cost, Quantity</p>
-            </div>
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #e6edf3; margin-bottom: 0.375rem;">Vendor priority (CSV/Excel) *</label>
-                <input type="file" name="vendor_priority" accept=".csv,.xlsx,.xls" required
-                    style="width: 100%; padding: 0.5rem; font-size: 0.875rem; color: #e6edf3; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
-                <p style="font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem;">Required columns: Vendor Name, priority_rank</p>
-            </div>
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #e6edf3; margin-bottom: 0.375rem;">Item spread (CSV/Excel) *</label>
-                <input type="file" name="item_spread" accept=".csv,.xlsx,.xls" required
-                    style="width: 100%; padding: 0.5rem; font-size: 0.875rem; color: #e6edf3; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
-                <p style="font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem;">Required column: Item ID</p>
-            </div>
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #e6edf3; margin-bottom: 0.375rem;">MPN map (CSV/Excel, optional)</label>
-                <input type="file" name="mpn_map" accept=".csv,.xlsx,.xls"
-                    style="width: 100%; padding: 0.5rem; font-size: 0.875rem; color: #e6edf3; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
-                <p style="font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem;">Columns: Item ID, mpn</p>
+                <p style="font-size: 0.75rem; color: #8b949e; margin-top: 0.25rem;">Required columns: Transaction Date, Item ID, Description, Unit Cost, Ext. Cost, Quantity, Vendor Name, Product Line. Optional: Mfg Part Number 1–5 (W–AA).</p>
             </div>
             <button type="submit" style="align-self: flex-start; padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #fff; background: #238636; border: 1px solid #2ea043; border-radius: 6px; cursor: pointer;">Upload and import</button>
         </form>

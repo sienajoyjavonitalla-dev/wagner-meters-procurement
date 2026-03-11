@@ -48,7 +48,7 @@ export default function DataImport() {
     <div className="app-main-inner" style={{ padding: '1.5rem 2rem' }}>
       <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#e6edf3' }}>Data Import</h1>
       <p style={{ color: '#8b949e', marginBottom: '1.5rem', fontSize: '0.9375rem' }}>
-        Upload inventory, vendor priority, item spread, and optional MPN map. This replaces the previous snapshot.
+        Upload a single inventory file (Excel or CSV). Columns A–V are stored as inventory rows; Mfg Part Number 1–5 (W–AA) are stored as MPNs. This replaces the previous import.
       </p>
 
       {success && (
@@ -66,24 +66,9 @@ export default function DataImport() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <input type="hidden" name="_token" value={window.__PROCUREMENT__?.csrfToken || ''} />
           <div>
-            <label style={labelStyle}>Inventory (Excel) *</label>
-            <input type="file" name="inventory" accept=".xlsx,.xls" required style={inputStyle} />
-            <p style={hintStyle}>Required columns: Transaction Date, Vendor Name, Item ID, Description, Ext. Cost, Unit Cost, Quantity</p>
-          </div>
-          <div>
-            <label style={labelStyle}>Vendor priority (CSV/Excel) *</label>
-            <input type="file" name="vendor_priority" accept=".csv,.xlsx,.xls" required style={inputStyle} />
-            <p style={hintStyle}>Required columns: Vendor Name, priority_rank</p>
-          </div>
-          <div>
-            <label style={labelStyle}>Item spread (CSV/Excel) *</label>
-            <input type="file" name="item_spread" accept=".csv,.xlsx,.xls" required style={inputStyle} />
-            <p style={hintStyle}>Required column: Item ID</p>
-          </div>
-          <div>
-            <label style={labelStyle}>MPN map (CSV/Excel, optional)</label>
-            <input type="file" name="mpn_map" accept=".csv,.xlsx,.xls" style={inputStyle} />
-            <p style={hintStyle}>Columns: Item ID, mpn</p>
+            <label style={labelStyle}>Inventory (Excel/CSV) *</label>
+            <input type="file" name="inventory" accept=".xlsx,.xls,.csv" required style={inputStyle} />
+            <p style={hintStyle}>Required columns: Transaction Date, Item ID, Description, Unit Cost, Ext. Cost, Quantity, Vendor Name, Product Line. Optional: Mfg Part Number 1–5 (W–AA).</p>
           </div>
           <button
             type="submit"

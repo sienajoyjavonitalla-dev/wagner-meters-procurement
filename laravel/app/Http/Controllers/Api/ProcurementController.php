@@ -3,21 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Action;
 use App\Jobs\RunResearchJob;
+use App\Models\AltVendor;
 use App\Models\DataImport;
-use App\Models\FxSnapshot;
-use App\Models\Item;
-use App\Models\Mapping;
-use App\Models\PriceFinding;
+use App\Models\Inventory;
+use App\Models\Mpn;
 use App\Models\ResearchRun;
-use App\Models\ResearchTask;
-use App\Services\DigiKeyClient;
-use App\Services\MouserClient;
-use App\Services\NexarClient;
-use App\Services\ClaudeResearchService;
 use App\Services\AppSettingsService;
 use App\Services\AuditLogService;
+use App\Services\GeminiResearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,75 +23,71 @@ class ProcurementController extends Controller
         return DataImport::currentFull()->value('id');
     }
 
-    protected function tasksForCurrentImport()
-    {
-        $importId = $this->currentImportId();
-        if ($importId === null) {
-            return ResearchTask::query()->whereRaw('1 = 0');
-        }
-        return ResearchTask::query()->whereHas('item', fn ($q) => $q->where('data_import_id', $importId));
-    }
-
     /**
-     * 3.1.1 GET KPIs/summary
+     * 3.1.1 GET KPIs/summary (inventory-based)
      */
     public function summary(): JsonResponse
     {
         $importId = $this->currentImportId();
         if ($importId === null) {
             return response()->json([
-                'queue_status_counts' => [],
-                'mapping_counts' => ['mapped' => 0, 'needs_mapping' => 0, 'non_catalog' => 0],
-                'modeled_savings_total' => 0,
+                'queue_status_counts' => ['researched' => 0, 'pending' => 0],
                 'provider_hit_counts' => [],
+                'savings_potential_per_vendor' => [],
             ]);
         }
 
-        $taskQuery = $this->tasksForCurrentImport();
-        $queueStatusCounts = (clone $taskQuery)->selectRaw('status, count(*) as count')
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->all();
-
-        $mappingRows = Mapping::query()
+        $inventories = Inventory::query()
             ->where('data_import_id', $importId)
-            ->get(['lookup_mode', 'mapping_status', 'mpn']);
-        $mappingCounts = ['mapped' => 0, 'needs_mapping' => 0, 'non_catalog' => 0];
-        foreach ($mappingRows as $m) {
-            $mode = strtolower(trim($m->lookup_mode ?? ''));
-            $status = strtolower(trim($m->mapping_status ?? ''));
-            $mpn = trim($m->mpn ?? '');
-            if (in_array($mode, ['non_catalog', 'noncatalog', 'custom'], true)) {
-                $mappingCounts['non_catalog']++;
-            } elseif ($mpn !== '' && in_array($status, ['mapped', 'verified'], true)) {
-                $mappingCounts['mapped']++;
-            } else {
-                $mappingCounts['needs_mapping']++;
+            ->with(['mpns', 'altVendors'])
+            ->get();
+
+        $researched = $inventories->whereNotNull('research_completed_at')->count();
+        $pending = $inventories->whereNull('research_completed_at')->count();
+        $queueStatusCounts = [
+            'researched' => $researched,
+            'pending' => $pending,
+        ];
+
+        $geminiTotal = (int) ResearchRun::query()->sum('gemini_hits');
+        $providerHitCounts = $geminiTotal > 0 ? ['gemini' => $geminiTotal] : [];
+
+        $savingsByVendor = [];
+        foreach ($inventories as $inv) {
+            $current = (float) ($inv->unit_cost ?? 0);
+            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
+            $lowestAlt = $inv->altVendors->min('unit_price');
+            $lowest = null;
+            if ($lowestMpn !== null && $lowestAlt !== null) {
+                $lowest = min((float) $lowestMpn, (float) $lowestAlt);
+            } elseif ($lowestMpn !== null) {
+                $lowest = (float) $lowestMpn;
+            } elseif ($lowestAlt !== null) {
+                $lowest = (float) $lowestAlt;
+            }
+            if ($lowest !== null && $current > $lowest) {
+                $vendor = (string) ($inv->vendor_name ?? 'Unknown');
+                $savingsByVendor[$vendor] = ($savingsByVendor[$vendor] ?? 0) + ($current - $lowest);
             }
         }
-
-        $taskIds = (clone $taskQuery)->pluck('id');
-        $modeledSavingsTotal = Action::query()
-            ->whereIn('research_task_id', $taskIds)
-            ->sum('estimated_savings');
-
-        $providerHitCounts = PriceFinding::query()
-            ->whereIn('research_task_id', $taskIds)
-            ->selectRaw('provider, count(*) as count')
-            ->groupBy('provider')
-            ->pluck('count', 'provider')
-            ->all();
+        arsort($savingsByVendor);
+        $savingsPotentialPerVendor = [];
+        foreach (array_slice($savingsByVendor, 0, 10, true) as $vendorName => $total) {
+            $savingsPotentialPerVendor[] = [
+                'vendor_name' => $vendorName,
+                'savings_total' => round((float) $total, 4),
+            ];
+        }
 
         return response()->json([
             'queue_status_counts' => $queueStatusCounts,
-            'mapping_counts' => $mappingCounts,
-            'modeled_savings_total' => round((float) $modeledSavingsTotal, 4),
             'provider_hit_counts' => $providerHitCounts,
+            'savings_potential_per_vendor' => $savingsPotentialPerVendor,
         ]);
     }
 
     /**
-     * 6.1.4 GET analytics: supplier savings and daily trend.
+     * 6.1.4 GET analytics: savings potential by vendor, optional daily trend.
      */
     public function analytics(): JsonResponse
     {
@@ -109,101 +99,84 @@ class ProcurementController extends Controller
             ]);
         }
 
-        $taskIds = $this->tasksForCurrentImport()->pluck('id');
+        $inventories = Inventory::query()
+            ->where('data_import_id', $importId)
+            ->whereNotNull('research_completed_at')
+            ->with(['mpns', 'altVendors'])
+            ->get();
 
-        $supplierSavings = Action::query()
-            ->join('research_tasks', 'actions.research_task_id', '=', 'research_tasks.id')
-            ->join('suppliers', 'research_tasks.supplier_id', '=', 'suppliers.id')
-            ->whereIn('actions.research_task_id', $taskIds)
-            ->selectRaw('suppliers.name as supplier_name, sum(actions.estimated_savings) as savings_total')
-            ->groupBy('suppliers.name')
-            ->orderByDesc('savings_total')
-            ->limit(10)
-            ->get()
-            ->map(fn ($row) => [
-                'supplier_name' => $row->supplier_name,
-                'savings_total' => round((float) $row->savings_total, 4),
-            ])
-            ->values()
-            ->all();
+        $savingsByVendor = [];
+        foreach ($inventories as $inv) {
+            $current = (float) ($inv->unit_cost ?? 0);
+            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
+            $lowestAlt = $inv->altVendors->min('unit_price');
+            $lowest = null;
+            if ($lowestMpn !== null && $lowestAlt !== null) {
+                $lowest = min((float) $lowestMpn, (float) $lowestAlt);
+            } elseif ($lowestMpn !== null) {
+                $lowest = (float) $lowestMpn;
+            } elseif ($lowestAlt !== null) {
+                $lowest = (float) $lowestAlt;
+            }
+            if ($lowest !== null && $current > $lowest) {
+                $vendor = (string) ($inv->vendor_name ?? 'Unknown');
+                $savingsByVendor[$vendor] = ($savingsByVendor[$vendor] ?? 0) + ($current - $lowest);
+            }
+        }
+        arsort($savingsByVendor);
+        $topSuppliers = [];
+        foreach (array_slice($savingsByVendor, 0, 10, true) as $vendorName => $total) {
+            $topSuppliers[] = [
+                'supplier_name' => $vendorName,
+                'savings_total' => round((float) $total, 4),
+            ];
+        }
 
-        $dailySavings = Action::query()
-            ->whereIn('research_task_id', $taskIds)
-            ->selectRaw('DATE(created_at) as day, sum(estimated_savings) as savings_total')
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->orderBy('day')
-            ->get()
-            ->map(fn ($row) => [
-                'day' => (string) $row->day,
-                'savings_total' => round((float) $row->savings_total, 4),
-            ])
-            ->values()
-            ->all();
+        $byDay = [];
+        foreach ($inventories as $inv) {
+            $day = $inv->research_completed_at?->format('Y-m-d');
+            if ($day === null) {
+                continue;
+            }
+            $current = (float) ($inv->unit_cost ?? 0);
+            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
+            $lowestAlt = $inv->altVendors->min('unit_price');
+            $lowest = null;
+            if ($lowestMpn !== null && $lowestAlt !== null) {
+                $lowest = min((float) $lowestMpn, (float) $lowestAlt);
+            } elseif ($lowestMpn !== null) {
+                $lowest = (float) $lowestMpn;
+            } elseif ($lowestAlt !== null) {
+                $lowest = (float) $lowestAlt;
+            }
+            $savings = ($lowest !== null && $current > $lowest) ? ($current - $lowest) : 0;
+            $byDay[$day] = ($byDay[$day] ?? 0) + $savings;
+        }
+        ksort($byDay);
+        $dailySavings = [];
+        foreach ($byDay as $day => $total) {
+            $dailySavings[] = ['day' => $day, 'savings_total' => round((float) $total, 4)];
+        }
 
         return response()->json([
-            'top_suppliers_by_savings' => $supplierSavings,
+            'top_suppliers_by_savings' => $topSuppliers,
             'daily_modeled_savings' => $dailySavings,
         ]);
     }
 
     /**
-     * 3.1.2 GET research queue: paginated, filters status, vendor, item search, priority
+     * 3.1.2 GET research queue (stub)
      */
     public function queue(Request $request): JsonResponse
     {
-        $importId = $this->currentImportId();
-        if ($importId === null) {
-            return response()->json(['data' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 15, 'total' => 0]]);
-        }
-
-        $q = $this->tasksForCurrentImport()->with(['item:id,internal_part_number,description,data_import_id', 'supplier:id,name']);
-
-        if ($request->filled('status')) {
-            $q->where('status', $request->input('status'));
-        }
-        if ($request->filled('vendor')) {
-            $q->whereHas('supplier', fn ($b) => $b->where('name', 'like', '%' . $request->input('vendor') . '%'));
-        }
-        if ($request->filled('item_search')) {
-            $term = $request->input('item_search');
-            $q->whereHas('item', fn ($b) => $b->where('internal_part_number', 'like', '%' . $term . '%')
-                ->orWhere('description', 'like', '%' . $term . '%'));
-        }
-        if ($request->filled('priority')) {
-            $q->where('priority', '<=', (int) $request->input('priority'));
-        }
-
-        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
-        $paginator = $q->orderBy('priority')->paginate($perPage);
-
-        $items = $paginator->getCollection()->map(fn ($t) => [
-            'id' => $t->id,
-            'task_type' => $t->task_type,
-            'status' => $t->status,
-            'priority' => $t->priority,
-            'batch_id' => $t->batch_id,
-            'notes' => $t->notes,
-            'description' => $t->description,
-            'spend_12m' => $t->spend_12m,
-            'qty_12m' => $t->qty_12m,
-            'avg_unit_cost_12m' => $t->avg_unit_cost_12m,
-            'item' => $t->item ? ['id' => $t->item->id, 'internal_part_number' => $t->item->internal_part_number, 'description' => $t->item->description] : null,
-            'supplier' => $t->supplier ? ['id' => $t->supplier->id, 'name' => $t->supplier->name] : null,
-        ]);
-
         return response()->json([
-            'data' => $items,
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ],
+            'data' => [],
+            'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 15, 'total' => 0],
         ]);
     }
 
     /**
-     * 3.1.3 GET price comparison: actions with best finding per task
+     * 3.1.3 GET price comparison (inventory-based: current vs lowest current vendor, vs lowest alt vendor)
      */
     public function priceComparison(Request $request): JsonResponse
     {
@@ -212,218 +185,93 @@ class ProcurementController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $taskIds = $this->tasksForCurrentImport()->pluck('id');
-        $actions = Action::query()
-            ->whereIn('research_task_id', $taskIds)
-            ->with(['researchTask.item', 'researchTask.supplier'])
+        $inventories = Inventory::query()
+            ->where('data_import_id', $importId)
+            ->with(['mpns', 'altVendors'])
+            ->orderBy('id')
             ->get();
 
-        $taskIdsWithActions = $actions->pluck('research_task_id')->all();
-        $bestFindings = PriceFinding::query()
-            ->whereIn('research_task_id', $taskIdsWithActions)
-            ->where('accepted', true)
-            ->get()
-            ->groupBy('research_task_id')
-            ->map(fn ($list) => $list->sortBy('min_unit_price')->first());
+        $data = [];
+        foreach ($inventories as $inv) {
+            $currentCost = (float) ($inv->unit_cost ?? 0);
+            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
+            $lowestMpnVal = $lowestMpn !== null ? (float) $lowestMpn : null;
+            $currentVendorName = (string) ($inv->vendor_name ?? '');
+            $gemini = $inv->gemini_response_json;
+            $currentVendorUrl = is_array($gemini) ? ($gemini['current_vendor_url'] ?? null) : null;
 
-        $data = $actions->map(function ($a) use ($bestFindings) {
-            $task = $a->researchTask;
-            $best = $bestFindings->get($a->research_task_id);
-            return [
-                'research_task_id' => $a->research_task_id,
-                'estimated_savings' => $a->estimated_savings,
-                'action_type' => $a->action_type,
-                'priority_score' => $a->priority_score,
-                'approval_status' => $a->approval_status,
-                'task_type' => $task?->task_type,
-                'item' => $task?->item ? ['id' => $task->item->id, 'internal_part_number' => $task->item->internal_part_number] : null,
-                'supplier' => $task?->supplier ? ['id' => $task->supplier->id, 'name' => $task->supplier->name] : null,
-                'avg_unit_cost_12m' => $task?->avg_unit_cost_12m,
-                'qty_12m' => $task?->qty_12m,
-                'best_finding' => $best ? [
-                    'provider' => $best->provider,
-                    'min_unit_price' => $best->min_unit_price,
-                    'currency' => $best->currency,
-                    'matched_mpn' => $best->matched_mpn,
-                ] : null,
+            $lowestAlt = $inv->altVendors->sortBy('unit_price')->first();
+            $lowestAltPrice = $lowestAlt ? (float) $lowestAlt->unit_price : null;
+            $lowestAltVendorName = $lowestAlt ? (string) $lowestAlt->vendor_name : null;
+            $lowestAltUrl = $lowestAlt ? (string) ($lowestAlt->url ?? '') : null;
+
+            $savingsVsCurrent = ($lowestMpnVal !== null && $currentCost > $lowestMpnVal)
+                ? round($currentCost - $lowestMpnVal, 4) : null;
+            $savingsVsAlt = ($lowestAltPrice !== null && $currentCost > $lowestAltPrice)
+                ? round($currentCost - $lowestAltPrice, 4) : null;
+
+            $data[] = [
+                'inventory_id' => $inv->id,
+                'item_id' => $inv->item_id,
+                'description' => $inv->description,
+                'vendor_name' => $currentVendorName,
+                'unit_cost' => $currentCost,
+                'quantity' => $inv->quantity,
+                'lowest_current_vendor_price' => $lowestMpnVal,
+                'current_vendor_name' => $currentVendorName,
+                'current_vendor_url' => $currentVendorUrl,
+                'savings_vs_current_vendor' => $savingsVsCurrent,
+                'lowest_alt_vendor_price' => $lowestAltPrice,
+                'lowest_alt_vendor_name' => $lowestAltVendorName,
+                'lowest_alt_vendor_url' => $lowestAltUrl ?: null,
+                'savings_vs_alt_vendor' => $savingsVsAlt,
             ];
-        });
-
-        return response()->json(['data' => $data->values()->all()]);
-    }
-
-    /**
-     * 3.1.4 GET research evidence: by task_id or item_id
-     */
-    public function evidence(Request $request): JsonResponse
-    {
-        $taskId = $request->input('task_id');
-        $itemId = $request->input('item_id');
-
-        if ($taskId !== null) {
-            $task = ResearchTask::with(['item', 'supplier', 'priceFindings'])->find($taskId);
-            if (! $task) {
-                return response()->json(['task' => null, 'price_findings' => []], 404);
-            }
-            return response()->json([
-                'task' => $this->formatTask($task),
-                'price_findings' => $task->priceFindings->map(fn ($f) => [
-                    'id' => $f->id,
-                    'provider' => $f->provider,
-                    'matched_mpn' => $f->matched_mpn,
-                    'currency' => $f->currency,
-                    'min_unit_price' => $f->min_unit_price,
-                    'match_score' => $f->match_score,
-                    'accepted' => $f->accepted,
-                ])->all(),
-            ]);
         }
-
-        if ($itemId !== null) {
-            $tasks = ResearchTask::with(['item', 'supplier', 'priceFindings'])
-                ->where('item_id', $itemId)
-                ->get();
-            $out = $tasks->map(fn ($t) => [
-                'task' => $this->formatTask($t),
-                'price_findings' => $t->priceFindings->map(fn ($f) => [
-                    'id' => $f->id,
-                    'provider' => $f->provider,
-                    'matched_mpn' => $f->matched_mpn,
-                    'min_unit_price' => $f->min_unit_price,
-                    'match_score' => $f->match_score,
-                    'accepted' => $f->accepted,
-                ])->all(),
-            ])->all();
-            return response()->json(['data' => $out]);
-        }
-
-        return response()->json(['error' => 'Provide task_id or item_id'], 400);
-    }
-
-    protected function formatTask(ResearchTask $t): array
-    {
-        return [
-            'id' => $t->id,
-            'task_type' => $t->task_type,
-            'status' => $t->status,
-            'priority' => $t->priority,
-            'notes' => $t->notes,
-            'item' => $t->item ? ['id' => $t->item->id, 'internal_part_number' => $t->item->internal_part_number, 'description' => $t->item->description] : null,
-            'supplier' => $t->supplier ? ['id' => $t->supplier->id, 'name' => $t->supplier->name] : null,
-        ];
-    }
-
-    /**
-     * 3.1.5 GET vendor progress: per-vendor task counts, processed %, totals
-     */
-    public function vendorProgress(Request $request): JsonResponse
-    {
-        $importId = $this->currentImportId();
-        if ($importId === null) {
-            return response()->json(['data' => []]);
-        }
-
-        $base = $this->tasksForCurrentImport()->with('supplier:id,name');
-        $byVendor = (clone $base)->selectRaw('supplier_id, count(*) as total')
-            ->groupBy('supplier_id')
-            ->get()
-            ->keyBy('supplier_id');
-
-        $processed = (clone $base)->whereIn('status', ['researched', 'skipped_non_catalog', 'needs_mapping'])
-            ->selectRaw('supplier_id, count(*) as count')
-            ->groupBy('supplier_id')
-            ->get()
-            ->keyBy('supplier_id');
-
-        $supplierIds = $byVendor->keys()->all();
-        $suppliers = \App\Models\Supplier::query()->whereIn('id', $supplierIds)->get()->keyBy('id');
-
-        $data = $byVendor->map(function ($row) use ($processed, $suppliers) {
-            $total = (int) $row->total;
-            $done = (int) ($processed->get($row->supplier_id)?->count ?? 0);
-            return [
-                'supplier_id' => $row->supplier_id,
-                'supplier_name' => $suppliers->get($row->supplier_id)?->name ?? '',
-                'task_total' => $total,
-                'task_processed' => $done,
-                'processed_pct' => $total > 0 ? round($done / $total * 100, 1) : 0,
-            ];
-        })->values()->all();
 
         return response()->json(['data' => $data]);
     }
 
     /**
-     * 3.1.6 GET mapping review queue; optional GET param for MPN worklist (top 20)
+     * 3.1.4 GET research evidence (stub)
      */
-    public function mappingReview(Request $request): JsonResponse
+    public function evidence(Request $request): JsonResponse
     {
-        $importId = $this->currentImportId();
-        if ($importId === null) {
-            return response()->json(['data' => [], 'mpn_worklist' => []]);
-        }
-
-        $mappings = Mapping::query()
-            ->where('data_import_id', $importId)
-            ->with('item:id,internal_part_number,description,data_import_id')
-            ->get();
-
-        $needsReview = $mappings->filter(function ($m) {
-            $status = strtolower(trim($m->mapping_status ?? ''));
-            $mode = strtolower(trim($m->lookup_mode ?? ''));
-            $mpn = trim($m->mpn ?? '');
-            if (in_array($mode, ['non_catalog', 'noncatalog', 'custom'], true)) {
-                return false;
-            }
-            if ($mpn !== '' && in_array($status, ['mapped', 'verified'], true)) {
-                return false;
-            }
-            return true;
-        })->map(fn ($m) => [
-            'id' => $m->id,
-            'item_id' => $m->item_id,
-            'internal_part_number' => $m->item?->internal_part_number,
-            'description' => $m->item?->description,
-            'mpn' => $m->mpn,
-            'mapping_status' => $m->mapping_status,
-            'lookup_mode' => $m->lookup_mode,
-        ])->values()->all();
-
-        $worklistLimit = (int) $request->input('worklist_limit', 20);
-        $mpnWorklist = array_slice($needsReview, 0, $worklistLimit);
-
-        return response()->json([
-            'data' => $needsReview,
-            'mpn_worklist' => $mpnWorklist,
-        ]);
+        return response()->json(['task' => null, 'price_findings' => []], 404);
     }
 
     /**
-     * 3.1.7 GET system health: last research run, FX snapshot, providers enabled
+     * 3.1.5 GET vendor progress (stub)
+     */
+    public function vendorProgress(Request $request): JsonResponse
+    {
+        return response()->json(['data' => []]);
+    }
+
+    /**
+     * 3.1.6 GET mapping review (stub)
+     */
+    public function mappingReview(Request $request): JsonResponse
+    {
+        return response()->json(['data' => [], 'mpn_worklist' => []]);
+    }
+
+    /**
+     * 3.1.7 GET system health: last research run, providers enabled (Gemini)
      */
     public function systemHealth(): JsonResponse
     {
-        $lastRun = ResearchTask::query()
-            ->whereIn('status', ['researched', 'needs_research'])
-            ->orderByDesc('updated_at')
-            ->value('updated_at');
+        $lastRun = ResearchRun::query()
+            ->whereIn('status', ['completed', 'failed'])
+            ->orderByDesc('completed_at')
+            ->first();
 
-        $fx = FxSnapshot::query()->where('key', 'fx_rates')->first();
-        $fxSnapshot = $fx ? ['captured_at' => $fx->created_at ?? null, 'base' => $fx->value_json['base'] ?? 'USD', 'rates_count' => count($fx->value_json['rates'] ?? [])] : null;
-
-        $digiKey = app(DigiKeyClient::class);
-        $mouser = app(MouserClient::class);
-        $nexar = app(NexarClient::class);
-        $claude = app(ClaudeResearchService::class);
+        $gemini = app(GeminiResearchService::class);
 
         return response()->json([
-            'last_research_run_at' => $lastRun?->toIso8601String(),
-            'fx_snapshot' => $fxSnapshot,
+            'last_research_run_at' => $lastRun?->completed_at?->format('c'),
+            'fx_snapshot' => null,
             'providers_enabled' => [
-                'digikey' => $digiKey->isEnabled(),
-                'mouser' => $mouser->isEnabled(),
-                'nexar' => $nexar->isEnabled(),
-                'claude' => $claude->isEnabled(),
+                'gemini' => $gemini->isEnabled(),
             ],
         ]);
     }

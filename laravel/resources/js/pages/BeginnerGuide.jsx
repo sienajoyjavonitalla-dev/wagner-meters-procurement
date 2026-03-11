@@ -26,57 +26,50 @@ export default function BeginnerGuide() {
     <div className="app-main-inner" style={{ padding: '1.5rem', maxWidth: 980 }}>
       <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#e6edf3' }}>Beginner&apos;s Guide</h1>
       <p style={{ color: '#8b949e', marginBottom: '1rem' }}>
-        This page explains the normal workflow from upload to reviewed savings actions.
+        This page explains the workflow from inventory import to price comparison and savings review.
       </p>
 
       <h2 style={{ fontSize: '1.125rem', marginBottom: '0.5rem', color: '#e6edf3' }}>Workflow</h2>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>1) Import files</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>1) Single inventory file import</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Open <strong>Data Import</strong>, upload inventory, vendor priority, item spread, and optional MPN map, then submit.
+          Open <strong>Data Import</strong>, upload one inventory file (Excel or CSV). Columns A–V are stored as inventory rows; Mfg Part Number 1–5 (W–AA) are stored as MPNs. Submit and wait for the import to complete.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Build queue + run research</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Run research (Gemini)</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Go to <strong>Run Controls</strong>, enable <strong>Build queue first</strong>, choose batch size and fallback mode, then click <strong>Start run</strong>.
+          Go to <strong>Run Controls</strong>, set the batch size (default 50), then click <strong>Start run</strong>. Research uses Gemini to fetch current-vendor prices (by MPN) and alternative US vendor prices for each inventory item in the batch.
         </p>
       </div>
 
       <div style={stepStyle}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>3) Monitor run status</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Stay on <strong>Run Controls</strong> and watch the latest run status (pending, running, completed, failed).
+          Stay on <strong>Run Controls</strong> and watch the latest run status (pending, running, completed, failed). Polling updates the status automatically.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>4) Review dashboard KPIs</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>4) Dashboard: queue and savings</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Open <strong>Dashboard</strong> to check queue progress, mapping counts, provider hits, and modeled savings trends.
+          Open <strong>Dashboard</strong> to check queue processed %, needs research count, provider hits (Gemini), savings trend by day, and <strong>savings potential per vendor</strong> (based on lowest price per item).
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>5) Work through operational views</h3>
-        <p style={{ color: '#8b949e', margin: '0 0 0.5rem' }}>
-          Use <strong>Research Queue</strong>, <strong>Price Comparison</strong>, <strong>Research Evidence</strong>, <strong>Vendor Progress</strong>, and <strong>Mapping Review</strong> for follow-up actions.
-        </p>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li><strong>Research Queue</strong>: monitor queued tasks and track processing backlog.</li>
-          <li><strong>Price Comparison</strong>: compare current cost vs best price and review estimated savings.</li>
-          <li><strong>Research Evidence</strong>: verify recommendation proof (provider, matched MPN, score, price).</li>
-          <li><strong>Vendor Progress</strong>: track completion by supplier and prioritize follow-up.</li>
-          <li><strong>Mapping Review</strong>: fix missing/weak mappings to improve research quality.</li>
-        </ol>
-      </div>
-
-      <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>6) Repeat as new data arrives</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>5) Item Price Comparison</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Re-import updated files, trigger a new run, and compare updated recommendations before procurement decisions.
+          Use <strong>Price Comparison</strong> to see current unit cost vs lowest current-vendor price (with link), savings vs current vendor, lowest alternative-vendor price (with link), and savings vs alt vendor. Filter by vendor, item ID, or minimum savings; export CSV for procurement review.
+        </p>
+      </div>
+
+      <div style={stepStyle}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>6) Users and Profile</h3>
+        <p style={{ color: '#8b949e', margin: 0 }}>
+          <strong>Users</strong> (super admin only) and <strong>Profile</strong> are unchanged. Re-import when you have new inventory data, trigger another research run, and compare updated recommendations before procurement decisions.
         </p>
       </div>
 
@@ -93,9 +86,9 @@ export default function BeginnerGuide() {
           Dashboard
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Check queue processed %, needs research, and mapping totals.</li>
-          <li>Review queue and provider charts for current run health.</li>
-          <li>Use this page first after each completed run.</li>
+          <li>Check queue processed %, needs research count, and provider hits (Gemini).</li>
+          <li>Review queue status pie chart and provider hits chart.</li>
+          <li>Use savings potential per vendor and savings trend for follow-up.</li>
         </ol>
       </div>
 
@@ -109,24 +102,8 @@ export default function BeginnerGuide() {
           Data Import
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Upload inventory, vendor priority, and item spread files.</li>
-          <li>Optionally upload MPN map for better catalog matching.</li>
+          <li>Upload a single inventory file (Excel or CSV) with columns A–V (inventory) and W–AA (MPNs).</li>
           <li>Submit and confirm import success before running research.</li>
-        </ol>
-      </div>
-
-      <div style={stepStyle}>
-        <h3 style={headingRowStyle}>
-          <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          Research Queue
-        </h3>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Filter by status, vendor, or item to focus work.</li>
-          <li>Review pending and needs-mapping tasks before reruns.</li>
-          <li>Use pagination to inspect all queued records.</li>
         </ol>
       </div>
 
@@ -139,75 +116,9 @@ export default function BeginnerGuide() {
           Price Comparison
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Filter by vendor/item and minimum savings threshold.</li>
-          <li>Review current vs best unit price and estimated savings.</li>
+          <li>Filter by vendor, item ID, or minimum savings.</li>
+          <li>Review current cost vs lowest current-vendor price and vs lowest alt-vendor price; use links to open vendor pages.</li>
           <li>Export CSV for procurement review and negotiations.</li>
-        </ol>
-      </div>
-
-      <div style={stepStyle}>
-        <h3 style={headingRowStyle}>
-          <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
-          Research Evidence
-        </h3>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Select a task from the dropdown.</li>
-          <li>Review finding details (provider, MPN, score, price).</li>
-          <li>Use evidence to confirm recommendation quality.</li>
-        </ol>
-      </div>
-
-      <div style={stepStyle}>
-        <h3 style={headingRowStyle}>
-          <svg style={iconStyle} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10,35 L90,35 L80,15 L20,15 Z" />
-            <path d="M10,35 Q10,48 23.3,48 Q36.6,48 36.6,35 Q36.6,48 50,48 Q63.4,48 63.4,35 Q63.4,48 76.7,48 Q90,48 90,35" />
-            <line x1="36.6" y1="16" x2="36.6" y2="35" />
-            <line x1="63.4" y1="16" x2="63.4" y2="35" />
-
-            <line x1="18" y1="35" x2="18" y2="80" />
-            <line x1="82" y1="35" x2="82" y2="80" />
-
-            <rect x="10" y="82" width="80" height="8" rx="4" />
-
-            <circle cx="50" cy="58" r="8" />
-            <path d="M34,82 C34,70 66,70 66,82" />
-            <circle cx="41" cy="80" r="0.5" fill="black" stroke="none" />
-            <circle cx="59" cy="80" r="0.5" fill="black" stroke="none" />
-
-            <g transform="translate(71, 52)">
-              <path d="M11,0 L22,6 L22,18 L11,24 L0,18 L0,6 Z" fill="white" />
-              <path d="M11,0 L22,6 L11,12 L0,6 Z" /> <path d="M0,6 L11,12 L11,24 L0,18 Z" /> <path d="M11,12 L22,6 L22,18 L11,24 Z" />
-            </g>
-          </svg>
-          Vendor Progress
-        </h3>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Check processed % by vendor.</li>
-          <li>Identify vendors with low completion or high backlog.</li>
-          <li>Use this to prioritize follow-up work by supplier.</li>
-        </ol>
-      </div>
-
-      <div style={stepStyle}>
-        <h3 style={headingRowStyle}>
-          <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
-          Mapping Review
-        </h3>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Review items missing or weak MPN mapping.</li>
-          <li>Download CSV and enrich mapping data externally if needed.</li>
-          <li>Re-import updated mapping data and rerun research.</li>
         </ol>
       </div>
 
@@ -219,8 +130,8 @@ export default function BeginnerGuide() {
           Run Controls
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Set build queue, fallback mode, and batch size.</li>
-          <li>Click <strong>Start run</strong> and monitor status.</li>
+          <li>Set batch size (default 50); optionally save research settings (e.g. Batch size (Gemini)).</li>
+          <li>Click <strong>Start run</strong> to trigger a Gemini research run and monitor status.</li>
           <li>Adjust settings only if you understand the impact.</li>
         </ol>
       </div>

@@ -69,26 +69,6 @@ export default function AuthenticatedLayout() {
             </NavIcon>
             Data Import
           </NavLink>
-          <NavLink to="/dashboard/research-queue" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
-            <NavIcon>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </NavIcon>
-            Research Queue
-          </NavLink>
-          <NavLink to="/dashboard/research-evidence" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
-            <NavIcon>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-            </NavIcon>
-            Research Evidence
-          </NavLink>
           <NavLink to="/dashboard/price-comparison" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
             <NavIcon>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -97,42 +77,6 @@ export default function AuthenticatedLayout() {
               </svg>
             </NavIcon>
             Price Comparison
-          </NavLink>
-          <NavLink to="/dashboard/vendor-progress" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
-            <NavIcon>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10,35 L90,35 L80,15 L20,15 Z" />
-                <path d="M10,35 Q10,48 23.3,48 Q36.6,48 36.6,35 Q36.6,48 50,48 Q63.4,48 63.4,35 Q63.4,48 76.7,48 Q90,48 90,35" />
-                <line x1="36.6" y1="16" x2="36.6" y2="35" />
-                <line x1="63.4" y1="16" x2="63.4" y2="35" />
-
-                <line x1="18" y1="35" x2="18" y2="80" />
-                <line x1="82" y1="35" x2="82" y2="80" />
-
-                <rect x="10" y="82" width="80" height="8" rx="4" />
-
-                <circle cx="50" cy="58" r="8" />
-                <path d="M34,82 C34,70 66,70 66,82" />
-                <circle cx="41" cy="80" r="0.5" fill="black" stroke="none" />
-                <circle cx="59" cy="80" r="0.5" fill="black" stroke="none" />
-
-                <g transform="translate(71, 52)">
-                  <path d="M11,0 L22,6 L22,18 L11,24 L0,18 L0,6 Z" fill="white" />
-                  <path d="M11,0 L22,6 L11,12 L0,6 Z" /> <path d="M0,6 L11,12 L11,24 L0,18 Z" /> <path d="M11,12 L22,6 L22,18 L11,24 Z" /> </g>
-              </svg>
-            </NavIcon>
-            Vendor Progress
-          </NavLink>
-          <NavLink to="/dashboard/mapping-review" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
-            <NavIcon>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-            </NavIcon>
-            Mapping Review
           </NavLink>
           <NavLink to="/dashboard/run-controls" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
             <NavIcon>

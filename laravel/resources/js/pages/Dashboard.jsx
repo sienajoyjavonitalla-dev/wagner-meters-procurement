@@ -70,19 +70,15 @@ export default function Dashboard() {
   }
 
   const queueStatusCounts = summary?.queue_status_counts ?? {};
-  const mappingCounts = summary?.mapping_counts ?? { mapped: 0, needs_mapping: 0, non_catalog: 0 };
-  const totalTasks = Object.values(queueStatusCounts).reduce((a, b) => a + Number(b), 0);
-  const processedStatuses = ['researched', 'skipped_non_catalog', 'needs_mapping'];
-  const processedCount = Object.entries(queueStatusCounts)
-    .filter(([k]) => processedStatuses.includes(k))
-    .reduce((a, [, v]) => a + Number(v), 0);
-  const needsResearchCount = Number(queueStatusCounts.needs_research ?? 0) + Number(queueStatusCounts.pending ?? 0);
-  const queueProcessedPct = totalTasks > 0 ? Math.round((processedCount / totalTasks) * 100) : 0;
+  const total = Number(queueStatusCounts.researched ?? 0) + Number(queueStatusCounts.pending ?? 0);
+  const researched = Number(queueStatusCounts.researched ?? 0);
+  const pending = Number(queueStatusCounts.pending ?? 0);
+  const queueProcessedPct = total > 0 ? Math.round((researched / total) * 100) : 0;
 
   const queuePieData = Object.entries(queueStatusCounts).map(([name, count]) => ({ name, value: Number(count) })).filter((d) => d.value > 0);
   const providerBarData = Object.entries(summary?.provider_hit_counts ?? {}).map(([name, count]) => ({ name, count: Number(count) }));
   const savingsTrend = analytics?.daily_modeled_savings ?? [];
-  const topSuppliers = analytics?.top_suppliers_by_savings ?? [];
+  const savingsPerVendor = summary?.savings_potential_per_vendor ?? analytics?.top_suppliers_by_savings ?? [];
 
   return (
     <div className="app-main-inner" style={{ padding: '1.5rem' }}>
@@ -98,19 +94,11 @@ export default function Dashboard() {
         </div>
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '1rem' }}>
           <div style={{ fontSize: '0.75rem', color: '#8b949e', marginBottom: 4 }}>Needs research</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#e6edf3' }}>{needsResearchCount}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#e6edf3' }}>{pending}</div>
         </div>
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: '#8b949e', marginBottom: 4 }}>Modeled savings</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#3fb950' }}>{formatSavings(summary?.modeled_savings_total)}</div>
-        </div>
-        <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: '#8b949e', marginBottom: 4 }}>Mapped</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#e6edf3' }}>{mappingCounts.mapped ?? 0}</div>
-        </div>
-        <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: '#8b949e', marginBottom: 4 }}>Needs mapping</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#e6edf3' }}>{mappingCounts.needs_mapping ?? 0}</div>
+          <div style={{ fontSize: '0.75rem', color: '#8b949e', marginBottom: 4 }}>Provider hits (Gemini)</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#e6edf3' }}>{Object.values(summary?.provider_hit_counts ?? {}).reduce((a, b) => a + Number(b), 0) || '—'}</div>
         </div>
       </div>
 
@@ -136,10 +124,10 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No queue data. Run a data import and build the queue.</p>
+            <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No queue data. Run a data import and run research.</p>
           )}
         </ChartContainer>
-        <ChartContainer title="Provider hits (catalog)">
+        <ChartContainer title="Provider hits (Gemini)">
           {providerBarData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={providerBarData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -157,7 +145,7 @@ export default function Dashboard() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: '1.5rem' }}>
-        <ChartContainer title="Modeled savings trend">
+        <ChartContainer title="Savings trend (by day)">
           {savingsTrend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={savingsTrend} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -172,20 +160,20 @@ export default function Dashboard() {
             <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No savings trend data yet.</p>
           )}
         </ChartContainer>
-        <ChartContainer title="Savings potential by current vendor">
-          {topSuppliers.length > 0 ? (
+        <ChartContainer title="Savings potential per vendor">
+          {savingsPerVendor.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e6edf3', fontSize: '0.875rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #30363d' }}>
-                    <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', color: '#8b949e' }}>Supplier</th>
-                    <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e' }}>Savings</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', color: '#8b949e' }}>Vendor</th>
+                    <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e' }}>Savings potential</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {topSuppliers.map((row) => (
-                    <tr key={row.supplier_name} style={{ borderBottom: '1px solid #30363d' }}>
-                      <td style={{ padding: '0.5rem 0.75rem' }}>{row.supplier_name}</td>
+                  {savingsPerVendor.map((row) => (
+                    <tr key={row.vendor_name ?? row.supplier_name} style={{ borderBottom: '1px solid #30363d' }}>
+                      <td style={{ padding: '0.5rem 0.75rem' }}>{row.vendor_name ?? row.supplier_name}</td>
                       <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>{formatSavings(row.savings_total)}</td>
                     </tr>
                   ))}
@@ -193,7 +181,7 @@ export default function Dashboard() {
               </table>
             </div>
           ) : (
-            <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No supplier analytics yet.</p>
+            <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No vendor savings data yet.</p>
           )}
         </ChartContainer>
       </div>

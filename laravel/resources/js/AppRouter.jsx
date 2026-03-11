@@ -5,11 +5,7 @@ import AuthenticatedLayout from './layouts/AuthenticatedLayout';
 import Dashboard from './pages/Dashboard';
 import DataImport from './pages/DataImport';
 import Profile from './pages/Profile';
-import ResearchQueue from './pages/ResearchQueue';
 import PriceComparison from './pages/PriceComparison';
-import ResearchEvidence from './pages/ResearchEvidence';
-import VendorProgress from './pages/VendorProgress';
-import MappingReview from './pages/MappingReview';
 import RunControls from './pages/RunControls';
 import BeginnerGuide from './pages/BeginnerGuide';
 import Users from './pages/Users';
@@ -39,11 +35,7 @@ export default function AppRouter() {
           <Route path="*" element={<AuthenticatedLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="dashboard/research-queue" element={<ResearchQueue />} />
             <Route path="dashboard/price-comparison" element={<PriceComparison />} />
-            <Route path="dashboard/research-evidence" element={<ResearchEvidence />} />
-            <Route path="dashboard/vendor-progress" element={<VendorProgress />} />
-            <Route path="dashboard/mapping-review" element={<MappingReview />} />
             <Route path="dashboard/run-controls" element={<RunControls />} />
             <Route path="dashboard/how-to-use" element={<BeginnerGuide />} />
             <Route path="dashboard/users" element={<Users />} />

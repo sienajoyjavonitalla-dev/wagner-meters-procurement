@@ -30,14 +30,20 @@ function downloadCSV(filename, content) {
   URL.revokeObjectURL(link.href);
 }
 
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 const COLUMNS = [
-  { key: 'item', header: 'Item', accessor: (r) => r.item?.internal_part_number ?? '' },
-  { key: 'vendor', header: 'Vendor', accessor: (r) => r.supplier?.name ?? '' },
-  { key: 'current', header: 'Current unit cost', accessor: (r) => formatNum(r.avg_unit_cost_12m) },
-  { key: 'best_price', header: 'Best unit price', accessor: (r) => (r.best_finding ? formatNum(r.best_finding.min_unit_price) : '—') },
-  { key: 'provider', header: 'Provider', accessor: (r) => r.best_finding?.provider ?? '—' },
-  { key: 'savings', header: 'Est. savings', accessor: (r) => formatSavings(r.estimated_savings) },
-  { key: 'action_type', header: 'Action type', accessor: (r) => r.action_type ?? '' },
+  { key: 'item_id', header: 'Item ID', accessor: (r) => r.item_id ?? '' },
+  { key: 'vendor_name', header: 'Current vendor', accessor: (r) => r.vendor_name ?? '' },
+  { key: 'unit_cost', header: 'Current unit cost', accessor: (r) => formatNum(r.unit_cost) },
+  { key: 'quantity', header: 'Quantity', accessor: (r) => r.quantity ?? '' },
+  { key: 'lowest_current_vendor_price', header: 'Lowest price (current vendor)', accessor: (r) => formatNum(r.lowest_current_vendor_price) },
+  { key: 'current_vendor_link', header: 'Current vendor (link)', accessor: (r) => r.current_vendor_name ?? '—' },
+  { key: 'savings_vs_current_vendor', header: 'Savings vs current vendor', accessor: (r) => formatSavings(r.savings_vs_current_vendor) },
+  { key: 'lowest_alt_vendor_price', header: 'Lowest price (alt vendor)', accessor: (r) => formatNum(r.lowest_alt_vendor_price) },
+  { key: 'lowest_alt_vendor_name', header: 'Alt vendor (link)', accessor: (r) => r.lowest_alt_vendor_name ?? '—' },
+  { key: 'savings_vs_alt_vendor', header: 'Savings vs alt vendor', accessor: (r) => formatSavings(r.savings_vs_alt_vendor) },
 ];
 
 export default function PriceComparison() {
@@ -47,6 +53,12 @@ export default function PriceComparison() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [itemFilter, setItemFilter] = useState('');
   const [minSavingsFilter, setMinSavingsFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [vendorFilter, itemFilter, minSavingsFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,13 +80,35 @@ export default function PriceComparison() {
   const filtered = useMemo(() => {
     let list = data;
     const v = vendorFilter.trim().toLowerCase();
-    if (v) list = list.filter((r) => (r.supplier?.name ?? '').toLowerCase().includes(v));
+    if (v) list = list.filter((r) => (r.vendor_name ?? '').toLowerCase().includes(v));
     const i = itemFilter.trim().toLowerCase();
-    if (i) list = list.filter((r) => (r.item?.internal_part_number ?? '').toLowerCase().includes(i));
+    if (i) list = list.filter((r) => (r.item_id ?? '').toLowerCase().includes(i));
     const minS = parseFloat(minSavingsFilter);
-    if (!Number.isNaN(minS) && minS > 0) list = list.filter((r) => (r.estimated_savings ?? 0) >= minS);
+    if (!Number.isNaN(minS) && minS > 0) {
+      list = list.filter((r) => {
+        const sCur = r.savings_vs_current_vendor ?? 0;
+        const sAlt = r.savings_vs_alt_vendor ?? 0;
+        return sCur >= minS || sAlt >= minS;
+      });
+    }
     return list;
   }, [data, vendorFilter, itemFilter, minSavingsFilter]);
+
+  const totalFiltered = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const start = (currentPage - 1) * perPage;
+  const paginatedRows = useMemo(
+    () => filtered.slice(start, start + perPage),
+    [filtered, start, perPage]
+  );
+
+  const goToPage = (p) => setPage(Math.max(1, Math.min(p, totalPages)));
+  const onPerPageChange = (e) => {
+    const val = Number(e.target.value) || DEFAULT_PAGE_SIZE;
+    setPerPage(val);
+    setPage(1);
+  };
 
   const handleExportCSV = () => {
     downloadCSV('price-comparison.csv', toCSV(filtered, COLUMNS));
@@ -119,7 +153,7 @@ export default function PriceComparison() {
         />
         <input
           type="text"
-          placeholder="Filter by item"
+          placeholder="Filter by item ID"
           value={itemFilter}
           onChange={(e) => setItemFilter(e.target.value)}
           style={{
@@ -186,29 +220,152 @@ export default function PriceComparison() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paginatedRows.length === 0 ? (
               <tr>
                 <td colSpan={COLUMNS.length} style={{ padding: '1rem', color: '#8b949e' }}>
                   No rows match the filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((row) => (
-                <tr key={row.research_task_id} style={{ borderBottom: '1px solid #30363d' }}>
-                  {COLUMNS.map((c) => (
-                    <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
-                      {c.accessor(row)}
-                    </td>
-                  ))}
+              paginatedRows.map((row) => (
+                <tr key={row.inventory_id} style={{ borderBottom: '1px solid #30363d' }}>
+                  {COLUMNS.map((c) => {
+                    if (c.key === 'current_vendor_link') {
+                      const url = row.current_vendor_url;
+                      return (
+                        <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
+                          {url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>
+                              {row.current_vendor_name || 'Link'}
+                            </a>
+                          ) : (
+                            row.current_vendor_name ?? '—'
+                          )}
+                        </td>
+                      );
+                    }
+                    if (c.key === 'lowest_alt_vendor_name') {
+                      const url = row.lowest_alt_vendor_url;
+                      const name = row.lowest_alt_vendor_name;
+                      return (
+                        <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
+                          {url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>
+                              {name || 'Link'}
+                            </a>
+                          ) : (
+                            name ?? '—'
+                          )}
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
+                        {c.accessor(row)}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
-      <p style={{ marginTop: '0.5rem', color: '#8b949e', fontSize: '0.8125rem' }}>
-        Showing {filtered.length} of {data.length} rows.
-      </p>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1rem', padding: '0.5rem 0' }}>
+        <p style={{ margin: 0, color: '#8b949e', fontSize: '0.8125rem' }}>
+          Showing {totalFiltered === 0 ? 0 : start + 1}–{Math.min(start + perPage, totalFiltered)} of {totalFiltered} rows
+          {data.length !== totalFiltered && ` (${data.length} total before filters)`}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <label style={{ color: '#8b949e', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            Rows per page
+            <select
+              value={perPage}
+              onChange={onPerPageChange}
+              style={{
+                padding: '0.25rem 0.5rem',
+                background: '#161b22',
+                border: '1px solid #30363d',
+                borderRadius: 6,
+                color: '#e6edf3',
+                fontSize: '0.8125rem',
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          <span style={{ color: '#8b949e', fontSize: '0.8125rem' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => goToPage(1)}
+            disabled={currentPage <= 1}
+            style={{
+              padding: '0.25rem 0.5rem',
+              background: currentPage <= 1 ? '#21262d' : '#161b22',
+              border: '1px solid #30363d',
+              borderRadius: 6,
+              color: currentPage <= 1 ? '#484f58' : '#e6edf3',
+              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              fontSize: '0.8125rem',
+            }}
+          >
+            First
+          </button>
+          <button
+            type="button"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+            style={{
+              padding: '0.25rem 0.5rem',
+              background: currentPage <= 1 ? '#21262d' : '#161b22',
+              border: '1px solid #30363d',
+              borderRadius: 6,
+              color: currentPage <= 1 ? '#484f58' : '#e6edf3',
+              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              fontSize: '0.8125rem',
+            }}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            style={{
+              padding: '0.25rem 0.5rem',
+              background: currentPage >= totalPages ? '#21262d' : '#161b22',
+              border: '1px solid #30363d',
+              borderRadius: 6,
+              color: currentPage >= totalPages ? '#484f58' : '#e6edf3',
+              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+              fontSize: '0.8125rem',
+            }}
+          >
+            Next
+          </button>
+          <button
+            type="button"
+            onClick={() => goToPage(totalPages)}
+            disabled={currentPage >= totalPages}
+            style={{
+              padding: '0.25rem 0.5rem',
+              background: currentPage >= totalPages ? '#21262d' : '#161b22',
+              border: '1px solid #30363d',
+              borderRadius: 6,
+              color: currentPage >= totalPages ? '#484f58' : '#e6edf3',
+              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+              fontSize: '0.8125rem',
+            }}
+          >
+            Last
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

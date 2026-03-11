@@ -17,8 +17,6 @@ function formatTime(iso) {
 
 export default function RunControls() {
   const isAdmin = isAdminUser();
-  const [build, setBuild] = useState(true);
-  const [agentFallback, setAgentFallback] = useState('claude');
   const [batchSize, setBatchSize] = useState(50);
   const [runId, setRunId] = useState(null);
   const [status, setStatus] = useState(null);
@@ -35,13 +33,14 @@ export default function RunControls() {
       setSettings({
         strict_mapping: !!s.strict_mapping,
         min_match_score: Number(s.min_match_score ?? 0.9),
-        claude_batch_size: Number(s.claude_batch_size ?? 50),
+        gemini_batch_size: Number(s.gemini_batch_size ?? 50),
         top_vendors: Number(s.top_vendors ?? 20),
         items_per_vendor: Number(s.items_per_vendor ?? 50),
         top_spread_items: Number(s.top_spread_items ?? 100),
         nightly_enabled: !!s.nightly_enabled,
         nightly_time: s.nightly_time || '01:00',
       });
+      setBatchSize(Number(s.gemini_batch_size ?? 50));
     }).catch(() => setSettings(null));
   }, []);
 
@@ -78,11 +77,7 @@ export default function RunControls() {
     if (!isAdmin) return;
     setTriggerError(null);
     setTriggering(true);
-    apiPost(API_RUN, {
-      build: build,
-      agent_fallback: agentFallback,
-      batch_size: batchSize,
-    })
+    apiPost(API_RUN, { batch_size: batchSize })
       .then((res) => {
         setRunId(res.run_id);
         setPolling(true);
@@ -109,6 +104,7 @@ export default function RunControls() {
     apiPost(API_SETTINGS, settings)
       .then((res) => {
         setSettings(res.research || settings);
+        setBatchSize(Number(settings.gemini_batch_size ?? 50));
         setSettingsMessage('Settings saved.');
       })
       .catch((err) => {
@@ -121,7 +117,7 @@ export default function RunControls() {
   return (
     <div className="app-main-inner" style={{ padding: '1.5rem' }}>
       <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#e6edf3' }}>Run Controls</h1>
-      <p style={{ color: '#8b949e', marginBottom: '1rem' }}>Trigger a research run and view last run status.</p>
+      <p style={{ color: '#8b949e', marginBottom: '1rem' }}>Trigger a Gemini research run and view last run status.</p>
       {!isAdmin && (
         <p style={{ color: '#d29922', marginBottom: '1rem', fontSize: '0.875rem' }}>
           Viewer mode: only admins can trigger runs or update settings.
@@ -142,8 +138,8 @@ export default function RunControls() {
                 <input type="number" min={0} max={1} step={0.01} disabled={!isAdmin} value={settings.min_match_score} onChange={(e) => setSettings((s) => ({ ...s, min_match_score: Number(e.target.value || 0.9) }))} style={{ marginLeft: '0.5rem', width: 90, padding: '0.35rem 0.5rem', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3' }} />
               </label>
               <label style={{ color: '#8b949e', fontSize: '0.875rem' }}>
-                Claude batch
-                <input type="number" min={1} max={500} disabled={!isAdmin} value={settings.claude_batch_size} onChange={(e) => setSettings((s) => ({ ...s, claude_batch_size: Number(e.target.value || 50) }))} style={{ marginLeft: '0.5rem', width: 80, padding: '0.35rem 0.5rem', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3' }} />
+                Batch size (Gemini)
+                <input type="number" min={1} max={500} disabled={!isAdmin} value={settings.gemini_batch_size} onChange={(e) => setSettings((s) => ({ ...s, gemini_batch_size: Number(e.target.value || 50) }))} style={{ marginLeft: '0.5rem', width: 80, padding: '0.35rem 0.5rem', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3' }} />
               </label>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', marginTop: '0.75rem' }}>
@@ -188,31 +184,8 @@ export default function RunControls() {
       </div>
 
       <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '1.25rem', marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#e6edf3', marginBottom: '0.75rem' }}>Trigger research run</h2>
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#e6edf3', marginBottom: '0.75rem' }}>Trigger research run (Gemini)</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#e6edf3', fontSize: '0.875rem' }}>
-            <input type="checkbox" checked={build} onChange={(e) => setBuild(e.target.checked)} />
-            Build queue first
-          </label>
-          <label style={{ color: '#8b949e', fontSize: '0.875rem' }}>
-            Agent fallback
-            <select
-              value={agentFallback}
-              onChange={(e) => setAgentFallback(e.target.value)}
-              style={{
-                marginLeft: '0.5rem',
-                padding: '0.35rem 0.5rem',
-                background: '#0d1117',
-                border: '1px solid #30363d',
-                borderRadius: 6,
-                color: '#e6edf3',
-              }}
-            >
-              <option value="claude">Claude</option>
-              <option value="codex">Codex</option>
-              <option value="none">None (API only)</option>
-            </select>
-          </label>
           <label style={{ color: '#8b949e', fontSize: '0.875rem' }}>
             Batch size
             <input

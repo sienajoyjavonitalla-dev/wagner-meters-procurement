@@ -17,7 +17,7 @@ function formatTime(iso) {
 
 export default function RunControls() {
   const isAdmin = isAdminUser();
-  const [batchSize, setBatchSize] = useState(50);
+  const [batchSize, setBatchSize] = useState(5);
   const [runId, setRunId] = useState(null);
   const [status, setStatus] = useState(null);
   const [triggering, setTriggering] = useState(false);
@@ -33,14 +33,14 @@ export default function RunControls() {
       setSettings({
         strict_mapping: !!s.strict_mapping,
         min_match_score: Number(s.min_match_score ?? 0.9),
-        gemini_batch_size: Number(s.gemini_batch_size ?? 50),
+        gemini_batch_size: Number(s.gemini_batch_size ?? 5),
         top_vendors: Number(s.top_vendors ?? 20),
         items_per_vendor: Number(s.items_per_vendor ?? 50),
         top_spread_items: Number(s.top_spread_items ?? 100),
         nightly_enabled: !!s.nightly_enabled,
         nightly_time: s.nightly_time || '01:00',
       });
-      setBatchSize(Number(s.gemini_batch_size ?? 50));
+      setBatchSize(Number(s.gemini_batch_size ?? 5));
     }).catch(() => setSettings(null));
   }, []);
 
@@ -104,7 +104,7 @@ export default function RunControls() {
     apiPost(API_SETTINGS, settings)
       .then((res) => {
         setSettings(res.research || settings);
-        setBatchSize(Number(settings.gemini_batch_size ?? 50));
+        setBatchSize(Number(settings.gemini_batch_size ?? 5));
         setSettingsMessage('Settings saved.');
       })
       .catch((err) => {
@@ -139,7 +139,7 @@ export default function RunControls() {
               </label>
               <label style={{ color: '#8b949e', fontSize: '0.875rem' }}>
                 Batch size (Gemini)
-                <input type="number" min={1} max={500} disabled={!isAdmin} value={settings.gemini_batch_size} onChange={(e) => setSettings((s) => ({ ...s, gemini_batch_size: Number(e.target.value || 50) }))} style={{ marginLeft: '0.5rem', width: 80, padding: '0.35rem 0.5rem', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3' }} />
+                <input type="number" min={1} max={500} disabled={!isAdmin} value={settings.gemini_batch_size} onChange={(e) => setSettings((s) => ({ ...s, gemini_batch_size: Number(e.target.value || 5) }))} style={{ marginLeft: '0.5rem', width: 80, padding: '0.35rem 0.5rem', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3' }} />
               </label>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', marginTop: '0.75rem' }}>
@@ -193,7 +193,7 @@ export default function RunControls() {
               min={1}
               max={500}
               value={batchSize}
-              onChange={(e) => setBatchSize(parseInt(e.target.value, 10) || 50)}
+              onChange={(e) => setBatchSize(parseInt(e.target.value, 10) || 5)}
               style={{
                 marginLeft: '0.5rem',
                 width: 70,

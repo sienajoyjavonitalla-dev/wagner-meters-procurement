@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 class RunResearchCommand extends Command
 {
     protected $signature = 'procurement:run-research
-                            {--limit=50 : Max inventory rows to process (no research_completed_at)}
+                            {--limit=5 : Max inventory rows to process (no research_completed_at)}
                             {--sync : Run research synchronously (default: dispatch job)}';
 
     protected $description = 'Run research: process up to N inventory rows via Gemini (batch of rows not yet researched).';
@@ -24,7 +24,7 @@ class RunResearchCommand extends Command
             return self::FAILURE;
         }
 
-        $limit = max(1, min(500, (int) $this->option('limit')));
+        $limit = max(1, min(500, (int) $this->option('limit') ?: 5));
         $job = new RunResearchJob($limit, null);
 
         if ($this->option('sync')) {

@@ -56,10 +56,10 @@ The inventory file must have columns A–V (inventory fields) and W–AA (Mfg Pa
 
 1. **Upload** the inventory file on **Data Import**. Wait until the import shows **completed** (refresh the page; the queue job runs in the background).
 2. **Run research** from the new import:
-   - **UI:** Go to **Run Controls**. Set batch size (default 50) and click **Start run**. Research uses Gemini to fetch current-vendor and alternative-vendor prices for inventory rows that have not yet been researched.
+   - **UI:** Go to **Run Controls**. Set batch size (default 5) and click **Start run**. Research uses Gemini to fetch current-vendor and alternative-vendor prices for inventory rows that have not yet been researched.
    - **CLI:**
      ```bash
-     php artisan procurement:run-research --limit=50
+     php artisan procurement:run-research --limit=5
      ```
      Add `--sync` to run synchronously instead of dispatching a job.
 3. **Review** results on the **Dashboard** (queue processed %, provider hits, savings per vendor) and **Price Comparison** (current vs lowest current/alt vendor, with links).
@@ -68,12 +68,12 @@ The inventory file must have columns A–V (inventory fields) and W–AA (Mfg Pa
 
 ```bash
 php artisan procurement:import-files path/to/inventory.xlsx
-php artisan procurement:run-research --limit=50 --sync
+php artisan procurement:run-research --limit=5 --sync
 ```
 
 Optional flags for `procurement:run-research`:
 
-- `--limit=N` — Max inventory rows to process (default 50, max 500).
+- `--limit=N` — Max inventory rows to process (default 5, max 500).
 - `--sync` — Run research synchronously instead of dispatching a queue job.
 
 Test Gemini config (and optionally run a part lookup):
@@ -88,7 +88,7 @@ php artisan procurement:test-providers --mpn=1N4148
 Configured via `config/procurement.php`:
 
 - **Gemini:** `GEMINI_API_KEY` (required for research). Optional: `GEMINI_BASE_URL`, `GEMINI_MODEL`, `GEMINI_MAX_OUTPUT_TOKENS`.
-- **Research:** `PROCUREMENT_GEMINI_BATCH_SIZE` (default 50), `PROCUREMENT_STRICT_MAPPING`, `PROCUREMENT_MIN_MATCH_SCORE`.
+- **Research:** `PROCUREMENT_GEMINI_BATCH_SIZE` (default 5), `PROCUREMENT_STRICT_MAPPING`, `PROCUREMENT_MIN_MATCH_SCORE`.
 
 ## Phase 5 Operations
 

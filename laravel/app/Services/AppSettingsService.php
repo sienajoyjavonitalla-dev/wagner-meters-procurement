@@ -15,7 +15,7 @@ class AppSettingsService
             'strict_mapping' => (bool) config('procurement.research.strict_mapping', true),
             'min_match_score' => (float) config('procurement.research.min_match_score', 0.9),
             'claude_batch_size' => (int) config('procurement.research.claude_batch_size', 50),
-            'gemini_batch_size' => (int) config('procurement.research.gemini_batch_size', 50),
+            'gemini_batch_size' => (int) config('procurement.research.gemini_batch_size', 5),
             'top_vendors' => (int) config('procurement.research.top_vendors', 20),
             'items_per_vendor' => (int) config('procurement.research.items_per_vendor', 50),
             'top_spread_items' => (int) config('procurement.research.top_spread_items', 100),
@@ -43,7 +43,7 @@ class AppSettingsService
         $next['strict_mapping'] = (bool) ($next['strict_mapping'] ?? true);
         $next['min_match_score'] = max(0.0, min(1.0, (float) ($next['min_match_score'] ?? 0.9)));
         $next['claude_batch_size'] = max(1, min(500, (int) ($next['claude_batch_size'] ?? 50)));
-        $next['gemini_batch_size'] = max(1, min(500, (int) ($next['gemini_batch_size'] ?? 50)));
+        $next['gemini_batch_size'] = max(1, min(500, (int) ($next['gemini_batch_size'] ?? 5)));
         $next['top_vendors'] = max(1, min(200, (int) ($next['top_vendors'] ?? 20)));
         $next['items_per_vendor'] = max(1, min(500, (int) ($next['items_per_vendor'] ?? 50)));
         $next['top_spread_items'] = max(1, min(1000, (int) ($next['top_spread_items'] ?? 100)));

@@ -41,7 +41,7 @@ export default function BeginnerGuide() {
       <div style={stepStyle}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Run research (Gemini)</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Go to <strong>Run Controls</strong>, set the batch size (default 50), then click <strong>Start run</strong>. Research uses Gemini to fetch current-vendor prices (by MPN) and alternative US vendor prices for each inventory item in the batch.
+          Go to <strong>Run Controls</strong>, set the batch size (default 5), then click <strong>Start run</strong>. Research uses Gemini to fetch current-vendor prices (by MPN) and alternative US vendor prices for each inventory item in the batch.
         </p>
       </div>
 

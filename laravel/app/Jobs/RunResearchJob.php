@@ -20,7 +20,7 @@ class RunResearchJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public int $limit = 50,
+        public int $limit = 5,
         public ?int $researchRunId = null,
     ) {
         $this->onQueue('default');
@@ -52,6 +52,7 @@ class RunResearchJob implements ShouldQueue
             $inventories = Inventory::query()
                 ->where('data_import_id', $importId)
                 ->whereNull('research_completed_at')
+                ->whereHas('mpns', fn ($q) => $q->whereNotNull('part_number')->where('part_number', '!=', ''))
                 ->with('mpns')
                 ->orderBy('id')
                 ->limit($this->limit)

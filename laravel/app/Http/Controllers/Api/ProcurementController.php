@@ -286,7 +286,7 @@ class ProcurementController extends Controller
             return response()->json(['error' => 'No completed full import found. Run a data import first.'], 422);
         }
 
-        $batchSize = (int) $request->input('batch_size', 50);
+        $batchSize = (int) $request->input('batch_size', 5);
         $batchSize = max(1, min($batchSize, 500));
 
         $run = ResearchRun::create([

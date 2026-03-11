@@ -170,7 +170,7 @@ PROMPT;
 
     protected function buildUrl(): string
     {
-        $base = rtrim($this->config['base_url'] ?? 'https://generativelanguage.googleapis.com/v1beta', '/');
+        $base = rtrim($this->config['base_url'] ?? 'https://generativelanguage.googleapis.com/v1', '/');
         $model = $this->config['model'] ?? 'gemini-1.5-flash';
         $key = $this->config['api_key'] ?? '';
 

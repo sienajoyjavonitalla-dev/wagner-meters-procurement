@@ -14,6 +14,14 @@ function formatSavings(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
+function getSavingsColor(value) {
+  if (value == null || Number.isNaN(value)) return undefined;
+  const n = Number(value);
+  if (n < 0) return '#f85149';
+  if (n > 0) return '#3fb950';
+  return undefined;
+}
+
 function toCSV(rows, columns) {
   const header = columns.map((c) => c.header).join(',');
   const escape = (v) => (v == null ? '' : String(v).replace(/"/g, '""'));
@@ -301,6 +309,15 @@ export default function PriceComparison() {
                         </td>
                       );
                     }
+                    if (c.key === 'savings_vs_current_vendor' || c.key === 'savings_vs_alt_vendor') {
+                      const val = c.key === 'savings_vs_current_vendor' ? row.savings_vs_current_vendor : row.savings_vs_alt_vendor;
+                      const color = getSavingsColor(val);
+                      return (
+                        <td key={c.key} style={{ ...cellStyle, ...(color ? { color } : {}) }}>
+                          {c.accessor(row)}
+                        </td>
+                      );
+                    }
                     if (c.key === 'alt_vendors_view') {
                       const altVendors = row.alt_vendors ?? [];
                       return (
@@ -400,14 +417,18 @@ export default function PriceComparison() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', color: '#e6edf3' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #30363d' }}>
+                      <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>MPN</th>
                       <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>Vendor</th>
                       <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>Price</th>
                       <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>Savings</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {altVendorsModalRow.alt_vendors.map((av, i) => (
+                    {[...(altVendorsModalRow.alt_vendors ?? [])]
+                      .sort((a, b) => String(a.part_number ?? '').localeCompare(String(b.part_number ?? '')))
+                      .map((av, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #30363d' }}>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>{av.part_number ?? '—'}</td>
                         <td style={{ padding: '0.5rem 0.75rem' }}>
                           {av.url ? (
                             <a href={av.url} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>
@@ -418,7 +439,9 @@ export default function PriceComparison() {
                           )}
                         </td>
                         <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>{formatNum(av.unit_price)}</td>
-                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>{formatSavings(av.savings)}</td>
+                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: getSavingsColor(av.savings) ?? '#e6edf3' }}>
+                          {formatSavings(av.savings)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

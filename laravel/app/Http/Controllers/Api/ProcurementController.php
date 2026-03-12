@@ -188,7 +188,7 @@ class ProcurementController extends Controller
         $inventories = Inventory::query()
             ->where('data_import_id', $importId)
             ->whereNotNull('research_completed_at')
-            ->with(['mpns', 'altVendors'])
+            ->with(['mpns', 'altVendors.mpn'])
             ->orderBy('id')
             ->get();
 
@@ -220,7 +220,12 @@ class ProcurementController extends Controller
             $allAltVendors = $inv->altVendors->sortBy('unit_price')->values()->map(function ($av) use ($extCost, $quantity) {
                 $up = (float) ($av->unit_price ?? 0);
                 $savings = ($quantity > 0) ? round($extCost - ($up * $quantity), 4) : null;
+                $partNumber = $av->relationLoaded('mpn') && $av->mpn
+                    ? (string) ($av->mpn->part_number ?? '')
+                    : '';
+
                 return [
+                    'part_number' => $partNumber,
                     'vendor_name' => (string) ($av->vendor_name ?? ''),
                     'unit_price' => $up,
                     'url' => ($av->url && trim((string) $av->url) !== '') ? trim((string) $av->url) : null,

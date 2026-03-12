@@ -39,9 +39,9 @@ export default function BeginnerGuide() {
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Run research (Gemini)</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Run research (API + Gemini)</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Go to <strong>Run Controls</strong>, set the batch size (default 5), then click <strong>Start run</strong>. Research uses Gemini to fetch current-vendor prices (by MPN) and alternative US vendor prices for each inventory item in the batch.
+          Go to <strong>Run Controls</strong>, set the batch size (default 5), then click <strong>Start run</strong>. For each item, <strong>current vendor</strong> pricing: if the vendor is DigiKey or Mouser, the app uses that vendor’s API first (tries MPNs in order until one returns a price); otherwise it uses Gemini. <strong>Alternative vendors</strong> are always researched via Gemini (other vendors) plus DigiKey and Mouser APIs when they are not the current vendor.
         </p>
       </div>
 
@@ -55,14 +55,14 @@ export default function BeginnerGuide() {
       <div style={stepStyle}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>4) Dashboard: queue and savings</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Open <strong>Dashboard</strong> to check queue processed %, needs research count, provider hits (Gemini), savings trend by day, and <strong>savings potential per vendor</strong> (based on lowest price per item).
+          Open <strong>Dashboard</strong> to check queue processed (researched vs pending), needs research count, provider hits (Gemini), and <strong>savings potential per vendor</strong> (based on lowest price per item). Use this to prioritize follow-up and negotiations.
         </p>
       </div>
 
       <div style={stepStyle}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>5) Item Price Comparison</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Use <strong>Price Comparison</strong> to see current unit cost vs lowest current-vendor price (with link), savings vs current vendor, lowest alternative-vendor price (with link), and savings vs alt vendor. Filter by vendor, item ID, or minimum savings; export CSV for procurement review.
+          Use <strong>Price Comparison</strong> to compare items in three sections: <strong>Item</strong> (Item ID, MPN list, Unit cost, Quantity, Total Cost), <strong>Current Vendor</strong> (Vendor link, Current Site Price, Savings vs Total Cost), and <strong>Alternative Vendor with Lowest Price</strong> (Vendor link, Lowest Price, Savings vs Total Cost). Savings are Total Cost minus (price × quantity). Click the view (eye) icon in the alt-vendor column to open a popup listing all alternative vendors with vendor, price, and savings. Filter by vendor, item ID, or minimum savings; export CSV for procurement review.
         </p>
       </div>
 
@@ -86,9 +86,9 @@ export default function BeginnerGuide() {
           Dashboard
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Check queue processed %, needs research count, and provider hits (Gemini).</li>
-          <li>Review queue status pie chart and provider hits chart.</li>
-          <li>Use savings potential per vendor and savings trend for follow-up.</li>
+          <li>Check queue processed (researched vs pending), needs research count, and provider hits (Gemini).</li>
+          <li>Review queue status and provider hits.</li>
+          <li>Use savings potential per vendor for follow-up and procurement decisions.</li>
         </ol>
       </div>
 
@@ -116,8 +116,9 @@ export default function BeginnerGuide() {
           Price Comparison
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Filter by vendor, item ID, or minimum savings.</li>
-          <li>Review current cost vs lowest current-vendor price and vs lowest alt-vendor price; use links to open vendor pages.</li>
+          <li>Use filters: vendor, item ID, or minimum savings.</li>
+          <li>Review Item (ID, MPN list, Unit cost, Quantity, Total Cost), Current Vendor (vendor link, site price, savings vs total cost), and Alternative Vendor (vendor link, lowest price, savings vs total cost). Savings = Total Cost − (price × quantity).</li>
+          <li>Click the view (eye) icon in the alt-vendor column to see all alternative vendors for that item in a popup (vendor, price, savings).</li>
           <li>Export CSV for procurement review and negotiations.</li>
         </ol>
       </div>
@@ -130,8 +131,8 @@ export default function BeginnerGuide() {
           Run Controls
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Set batch size (default 50); optionally save research settings (e.g. Batch size (Gemini)).</li>
-          <li>Click <strong>Start run</strong> to trigger a Gemini research run and monitor status.</li>
+          <li>Set batch size (default 5); optionally save research settings (e.g. Batch size (Gemini)).</li>
+          <li>Click <strong>Start run</strong> to trigger a research run (DigiKey/Mouser API when applicable, then Gemini for current and alt vendors). Monitor status (pending, running, completed, failed).</li>
           <li>Adjust settings only if you understand the impact.</li>
         </ol>
       </div>

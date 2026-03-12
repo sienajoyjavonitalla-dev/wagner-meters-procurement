@@ -94,7 +94,7 @@ class VendorApiResearchService
         $currency = 'USD';
         $total = count($mpns);
 
-        // Sequential fallback: try MPN 1, if no success try MPN 2, then 3, etc. Use only the first MPN that succeeds for current vendor.
+        // Try every MPN and save price/URL for each that returns a result (no early exit).
         foreach ($mpns as $index => $partNumber) {
             $partNumber = trim((string) $partNumber);
             if ($partNumber === '') {
@@ -124,11 +124,10 @@ class VendorApiResearchService
                     $currency = $finding->currency;
                 }
                 $urlPreview = $finding->productUrl !== null ? mb_substr($finding->productUrl, 0, 80) . (mb_strlen($finding->productUrl) > 80 ? '...' : '') : null;
-                Log::info("VendorApiResearchService: DigiKey MPN {$partNumber}: 1 result (using this MPN for current vendor, not trying remaining)", [
+                Log::info("VendorApiResearchService: DigiKey MPN {$partNumber}: 1 result (saved for current vendor)", [
                     'unit_price' => $unitPrice,
                     'url' => $urlPreview,
                 ]);
-                break;
             }
         }
 
@@ -137,8 +136,8 @@ class VendorApiResearchService
             return null;
         }
 
-        Log::info('VendorApiResearchService: DigiKey current_vendor_results (first success only)', [
-            'part_number' => $currentVendorResults[0]['part_number'] ?? null,
+        Log::info('VendorApiResearchService: DigiKey current_vendor_results (all MPNs with API results)', [
+            'part_numbers' => array_column($currentVendorResults, 'part_number'),
         ]);
 
         $result = [
@@ -165,7 +164,7 @@ class VendorApiResearchService
         $currency = 'USD';
         $total = count($mpns);
 
-        // Sequential fallback: try MPN 1, if no success try MPN 2, then 3, etc. Use only the first MPN that succeeds for current vendor.
+        // Try every MPN and save price/URL for each that returns a result (no early exit).
         foreach ($mpns as $index => $partNumber) {
             $partNumber = trim((string) $partNumber);
             if ($partNumber === '') {
@@ -195,11 +194,10 @@ class VendorApiResearchService
                     $currency = $finding->currency;
                 }
                 $urlPreview = $finding->productUrl !== null ? mb_substr($finding->productUrl, 0, 80) . (mb_strlen($finding->productUrl) > 80 ? '...' : '') : null;
-                Log::info("VendorApiResearchService: Mouser MPN {$partNumber}: 1 result (using this MPN for current vendor, not trying remaining)", [
+                Log::info("VendorApiResearchService: Mouser MPN {$partNumber}: 1 result (saved for current vendor)", [
                     'unit_price' => $unitPrice,
                     'url' => $urlPreview,
                 ]);
-                break;
             }
         }
 
@@ -208,8 +206,8 @@ class VendorApiResearchService
             return null;
         }
 
-        Log::info('VendorApiResearchService: Mouser current_vendor_results (first success only)', [
-            'part_number' => $currentVendorResults[0]['part_number'] ?? null,
+        Log::info('VendorApiResearchService: Mouser current_vendor_results (all MPNs with API results)', [
+            'part_numbers' => array_column($currentVendorResults, 'part_number'),
         ]);
 
         $result = [

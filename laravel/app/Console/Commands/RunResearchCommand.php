@@ -12,9 +12,10 @@ class RunResearchCommand extends Command
 {
     protected $signature = 'procurement:run-research
                             {--limit=5 : Max inventory rows to process (no research_completed_at)}
+                            {--inventory-id= : Run research for a single inventory ID only (for testing; re-runs even if already researched)}
                             {--sync : Run research synchronously (default: dispatch job)}';
 
-    protected $description = 'Run research: process up to N inventory rows via Gemini (batch of rows not yet researched).';
+    protected $description = 'Run research: process up to N inventory rows via Gemini (batch of rows not yet researched). Use --inventory-id=ID to test a single item.';
 
     public function handle(): int
     {
@@ -25,12 +26,14 @@ class RunResearchCommand extends Command
         }
 
         $limit = max(1, min(500, (int) $this->option('limit') ?: 5));
-        $job = new RunResearchJob($limit, null);
+        $inventoryId = $this->option('inventory-id') !== null ? (int) $this->option('inventory-id') : null;
+        $job = new RunResearchJob($limit, null, $inventoryId);
 
         if ($this->option('sync')) {
-            $this->info('Running research synchronously...');
+            $this->info('Running research synchronously...'.($inventoryId ? " (inventory ID: {$inventoryId})" : ''));
             $job->handle(
-                app(GeminiResearchService::class),
+                app(\App\Services\GeminiResearchService::class),
+                app(\App\Services\VendorApiResearchService::class),
                 app(AuditLogService::class),
             );
             $this->info('Done.');

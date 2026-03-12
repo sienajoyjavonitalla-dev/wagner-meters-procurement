@@ -266,6 +266,9 @@ export default function RunControls() {
         ) : (
           <p style={{ color: '#8b949e' }}>No run status yet. Trigger a run above.</p>
         )}
+        <p style={{ color: '#8b949e', marginTop: '0.75rem', fontSize: '0.8125rem' }}>
+          Note: If any items failed (e.g. rate limit), they will be retried automatically in a later run (~5 min).
+        </p>
         {polling && <p style={{ color: '#58a6ff', marginTop: '0.5rem', fontSize: '0.8125rem' }}>Polling for updates…</p>}
       </div>
     </div>

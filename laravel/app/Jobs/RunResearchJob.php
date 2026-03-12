@@ -23,6 +23,7 @@ class RunResearchJob implements ShouldQueue
     public function __construct(
         public int $limit = 5,
         public ?int $researchRunId = null,
+        public ?int $inventoryId = null,
     ) {
         $this->onQueue('default');
     }
@@ -35,6 +36,7 @@ class RunResearchJob implements ShouldQueue
         }
         $auditLog->log('research.run.started', null, 'research_run', $run?->id, [
             'limit' => $this->limit,
+            'inventory_id' => $this->inventoryId,
         ]);
 
         try {
@@ -50,20 +52,28 @@ class RunResearchJob implements ShouldQueue
                 return;
             }
 
-            $inventories = Inventory::query()
+            $query = Inventory::query()
                 ->where('data_import_id', $importId)
-                ->whereNull('research_completed_at')
                 ->whereHas('mpns', fn ($q) => $q->whereNotNull('part_number')->where('part_number', '!=', ''))
-                ->with('mpns')
-                ->orderBy('id')
-                ->limit($this->limit)
-                ->get();
+                ->with('mpns');
+
+            if ($this->inventoryId !== null) {
+                $query->where('id', $this->inventoryId);
+                // For single-item test run, allow already-researched items (no filter on research_completed_at).
+            } else {
+                $query->whereNull('research_completed_at')->orderBy('id')->limit($this->limit);
+            }
+
+            $inventories = $query->get();
 
             if ($inventories->isEmpty()) {
+                $message = $this->inventoryId !== null
+                    ? 'Inventory ID '.$this->inventoryId.' not found, or not in current import, or has no MPNs.'
+                    : 'No inventory rows pending research.';
                 if ($run) {
                     $run->update([
                         'status' => 'completed',
-                        'message' => 'No inventory rows pending research.',
+                        'message' => $message,
                         'gemini_hits' => 0,
                         'completed_at' => now(),
                     ]);
@@ -73,6 +83,7 @@ class RunResearchJob implements ShouldQueue
             }
 
             $geminiHits = 0;
+            $successCount = 0;
             foreach ($inventories as $inventory) {
                 $mpns = $inventory->mpns->pluck('part_number')->filter()->values()->all();
                 $quantity = (float) ($inventory->quantity ?? 1);
@@ -130,6 +141,7 @@ class RunResearchJob implements ShouldQueue
                         }
                     }
                     PersistGeminiResultJob::dispatch($inventory->id, $result);
+                    $successCount++;
                 } else {
                     $context = ['error' => $result['error'] ?? 'Unknown'];
                     if (! empty($result['raw_text'])) {
@@ -149,10 +161,27 @@ class RunResearchJob implements ShouldQueue
                 }
             }
 
+            $failedCount = $inventories->count() - $successCount;
+            $message = 'Processed '.$inventories->count().' inventory rows.';
+            if ($failedCount > 0) {
+                $message .= ' '.$failedCount.' failed (will retry automatically in ~5 min).';
+                // Schedule a retry so unresearched items (failed ones) get picked up again.
+                $retryRun = ResearchRun::create([
+                    'status' => 'pending',
+                    'batch_id' => null,
+                    'limit' => $this->limit,
+                    'use_claude' => false,
+                    'use_gemini' => true,
+                    'build_queue' => false,
+                    'message' => 'Scheduled retry in 5 min for failed items.',
+                ]);
+                self::dispatch($this->limit, $retryRun->id)->delay(now()->addMinutes(5));
+            }
+
             if ($run) {
                 $run->update([
                     'status' => 'completed',
-                    'message' => 'Processed '.$inventories->count().' inventory rows.',
+                    'message' => $message,
                     'gemini_hits' => $geminiHits,
                     'completed_at' => now(),
                 ]);
@@ -160,6 +189,8 @@ class RunResearchJob implements ShouldQueue
             $auditLog->log('research.run.completed', null, 'research_run', $run?->id, [
                 'gemini_hits' => $geminiHits,
                 'processed' => $inventories->count(),
+                'success_count' => $successCount,
+                'failed_count' => $failedCount,
             ]);
         } catch (Throwable $e) {
             Log::error('RunResearchJob failed: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);

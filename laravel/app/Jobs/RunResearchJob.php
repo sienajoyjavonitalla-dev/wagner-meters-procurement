@@ -94,45 +94,25 @@ class RunResearchJob implements ShouldQueue
                 if ($result === null) {
                     $vendorIsApiOnly = self::vendorIsDigiKeyOrMouser($vendorName);
                     if ($vendorIsApiOnly) {
-                        Log::warning('RunResearchJob: Vendor is DigiKey/Mouser but API returned no results; not using Gemini for current vendor (mpn table is updated from API only). Skipping inventory.', [
-                            'inventory_id' => $inventory->id,
-                            'vendor_name' => $vendorName,
-                        ]);
                         continue;
                     }
-                    $result = $gemini->lookup($vendorName, $productLine, $mpns, $quantity);
+                    $result = $gemini->lookup($vendorName, $productLine, $mpns, $quantity, $inventory->id);
                     $geminiHits++;
                 } else {
-                    // Current vendor = DigiKey or Mouser (API). Alt vendors: other API (e.g. Mouser if current=DigiKey) + Gemini (always).
-                    Log::info('RunResearchJob: Vendor API lookup used for inventory '.$inventory->id, [
-                        'source' => $result['source'] ?? 'api',
-                    ]);
-                    $geminiAlt = $gemini->lookupAltVendorsOnly($vendorName, $productLine, $mpns, $quantity);
+                    $geminiAlt = $gemini->lookupAltVendorsOnly($vendorName, $productLine, $mpns, $quantity, $inventory->id);
                     if ($geminiAlt['success'] && ! empty($geminiAlt['alt_vendor_results'])) {
                         $result['alt_vendor_results'] = VendorApiResearchService::mergeAltVendorResults(
                             $result['alt_vendor_results'] ?? [],
                             $geminiAlt['alt_vendor_results']
                         );
-                    } elseif (! empty($geminiAlt['error'])) {
-                        Log::warning('RunResearchJob: Gemini alt-vendors-only failed for inventory '.$inventory->id, [
-                            'error' => $geminiAlt['error'],
-                        ]);
                     }
                 }
 
                 if ($result['success'] ?? false) {
-                    if (! empty($result['prompt'])) {
-                        $prompt = $result['prompt'];
-                        Log::info('RunResearchJob: Gemini lookup succeeded for inventory '.$inventory->id, [
-                            'prompt' => strlen($prompt) > 4000
-                                ? substr($prompt, 0, 4000) . "\n... (truncated, total " . strlen($prompt) . " chars)"
-                                : $prompt,
-                        ]);
-                    }
                     // Alt vendors: always include Gemini. If current vendor is not DigiKey/Mouser, also add DigiKey API + Mouser API.
                     $fromVendorApi = isset($result['source']) && in_array($result['source'], ['digikey_api', 'mouser_api'], true);
                     if (! $fromVendorApi) {
-                        $apiAlt = $vendorApi->fetchAltVendorsFromApis($mpns, $quantity, $vendorName);
+                        $apiAlt = $vendorApi->fetchAltVendorsFromApis($mpns, $quantity, $vendorName, $inventory->id);
                         if ($apiAlt !== []) {
                             $result['alt_vendor_results'] = VendorApiResearchService::mergeAltVendorResults(
                                 $result['alt_vendor_results'] ?? [],
@@ -143,20 +123,6 @@ class RunResearchJob implements ShouldQueue
                     PersistGeminiResultJob::dispatch($inventory->id, $result);
                     $successCount++;
                 } else {
-                    $context = ['error' => $result['error'] ?? 'Unknown'];
-                    if (! empty($result['raw_text'])) {
-                        $raw = $result['raw_text'];
-                        $context['raw_response'] = strlen($raw) > 4000
-                            ? substr($raw, 0, 4000) . "\n... (truncated, total " . strlen($raw) . " chars)"
-                            : $raw;
-                    }
-                    if (! empty($result['prompt'])) {
-                        $prompt = $result['prompt'];
-                        $context['prompt'] = strlen($prompt) > 4000
-                            ? substr($prompt, 0, 4000) . "\n... (truncated, total " . strlen($prompt) . " chars)"
-                            : $prompt;
-                    }
-                    Log::warning('RunResearchJob: Gemini lookup failed for inventory '.$inventory->id, $context);
                     // Leave research_completed_at null so it can be retried
                 }
             }

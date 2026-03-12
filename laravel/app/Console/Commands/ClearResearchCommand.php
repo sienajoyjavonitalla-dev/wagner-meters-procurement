@@ -14,7 +14,7 @@ class ClearResearchCommand extends Command
                             {--runs-only : Only delete research_runs records; do not reset inventory/mpn/alt_vendors}
                             {--inventory-id= : Clear research for a single inventory by ID (no runs deleted)}';
 
-    protected $description = 'Remove previous research runs and reset research-derived data so new research can run with the current schema.';
+    protected $description = 'Remove previous research runs and reset research-derived data so new research can run with the current schema. Does not clear researched_mpn (API/Gemini cache is preserved).';
 
     public function handle(): int
     {
@@ -51,6 +51,7 @@ class ClearResearchCommand extends Command
         ]);
         $this->info('Cleared research_completed_at and gemini_response_json on all inventories.');
 
+        $this->info('researched_mpn table left intact (cache preserved).');
         $this->info('Done. You can run research again with the new schema.');
 
         return self::SUCCESS;

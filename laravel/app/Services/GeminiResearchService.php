@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\AltVendor;
 use App\Models\Inventory;
 use App\Models\Mpn;
+use App\Models\ResearchedMpn;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GeminiResearchService
 {
@@ -39,7 +41,7 @@ class GeminiResearchService
      *   raw_text: string|null
      * }
      */
-    public function lookup(string $vendorName, string $productLine, array $mpns, float $quantity): array
+    public function lookup(string $vendorName, string $productLine, array $mpns, float $quantity, ?int $inventoryId = null): array
     {
         $emptyResult = [
             'success' => false,
@@ -54,6 +56,20 @@ class GeminiResearchService
             $emptyResult['error'] = 'Gemini disabled: missing GEMINI_API_KEY';
 
             return $emptyResult;
+        }
+
+        $cacheKey = $this->geminiCacheKey($vendorName, $productLine, $mpns, $quantity, 'full');
+        $cached = ResearchedMpn::getCached($cacheKey, ResearchedMpn::SOURCE_GEMINI);
+        if ($cached !== null && ! empty($cached['success'])) {
+            if ($inventoryId !== null) {
+                Log::info("item_id {$inventoryId}: Gemini AI (full) (researched_mpn)");
+            }
+            $cached['prompt'] = $cached['prompt'] ?? null;
+            return $cached;
+        }
+
+        if ($inventoryId !== null) {
+            Log::info("item_id {$inventoryId}: Gemini AI (full) (direct)");
         }
 
         $prompt = $this->buildPrompt($vendorName, $productLine, $mpns, $quantity);
@@ -182,7 +198,7 @@ class GeminiResearchService
             }
         }
 
-        return [
+        $result = [
             'success' => true,
             'current_vendor_results' => $currentVendorResults,
             'current_vendor_currency' => $currency,
@@ -191,6 +207,8 @@ class GeminiResearchService
             'raw_text' => $text,
             'prompt' => $prompt,
         ];
+        ResearchedMpn::setCached($cacheKey, ResearchedMpn::SOURCE_GEMINI, $result);
+        return $result;
     }
 
     protected function buildPrompt(string $vendorName, string $productLine, array $mpns, float $quantity): string
@@ -250,13 +268,37 @@ PROMPT;
     }
 
     /**
-     * Look up alternative vendors only via Gemini (no current vendor lookup).
-     * Use when current vendor was successfully fetched from DigiKey or Mouser API.
+     * Build prompt for a single MPN (alt vendors only).
+     */
+    protected function buildPromptForAltVendorsOneMpn(string $currentVendorName, string $productLine, string $mpn, float $quantity): string
+    {
+        $mpn = trim($mpn);
+        $mpnBlock = $mpn !== '' ? 'Manufacturing part number: '.$mpn : 'No part number provided.';
+
+        return <<<PROMPT
+You are a procurement research assistant. Answer with valid JSON only, no other text.
+
+The current vendor ({$currentVendorName}) pricing is already known. For the manufacturing part number below, search for US-based ALTERNATIVE vendors only (e.g. Newark, Arrow, Avnet, Farnell). Do NOT include {$currentVendorName} in the results. Do NOT include Digi-Key or Mouser in the results (those are filled from API separately). Return alternative vendors with unit price and product URL, sorted by lowest unit_price first.
+
+Context:
+- Current vendor (exclude from results): {$currentVendorName}
+- Product line: {$productLine}
+- Quantity: {$quantity}
+- {$mpnBlock}
+
+Return a single JSON object with exactly this key:
+- "alt_vendor_results" (array): one object with "part_number" (string, the exact MPN "{$mpn}"), "vendors" (array of objects). Each vendor object has "vendor_name" (string), "unit_price" (number), "url" (string or null). List only vendors that are NOT {$currentVendorName}. Do NOT include Digi-Key or Mouser. Sort vendors by lowest unit_price first.
+
+Return only the JSON object.
+PROMPT;
+    }
+
+    /**
+     * Look up alternative vendors for a single MPN via Gemini. Uses cache_key = MPN in researched_mpn.
      *
-     * @param  array<int, string>  $mpns
      * @return array{success: bool, alt_vendor_results: array, error: string|null, raw_text: string|null, prompt: string|null}
      */
-    public function lookupAltVendorsOnly(string $currentVendorName, string $productLine, array $mpns, float $quantity): array
+    protected function lookupAltVendorsForOneMpn(string $currentVendorName, string $productLine, string $mpn, float $quantity, ?int $inventoryId = null): array
     {
         $emptyResult = [
             'success' => false,
@@ -266,20 +308,25 @@ PROMPT;
             'prompt' => null,
         ];
 
-        if (! $this->isEnabled()) {
-            $emptyResult['error'] = 'Gemini disabled: missing GEMINI_API_KEY';
-
-            return $emptyResult;
-        }
-
-        if ($mpns === []) {
+        $mpn = trim($mpn);
+        if ($mpn === '') {
             $emptyResult['success'] = true;
-
             return $emptyResult;
         }
 
-        $prompt = $this->buildPromptForAltVendorsOnly($currentVendorName, $productLine, $mpns, $quantity);
-        $emptyResult['prompt'] = $prompt;
+        $cached = ResearchedMpn::getCached($mpn, ResearchedMpn::SOURCE_GEMINI);
+        if ($cached !== null && ! empty($cached['success']) && ! empty($cached['alt_vendor_results'])) {
+            if ($inventoryId !== null) {
+                Log::info("item_id {$inventoryId}: Gemini AI (alt) (researched_mpn)");
+            }
+            return $cached;
+        }
+
+        if ($inventoryId !== null) {
+            Log::info("item_id {$inventoryId}: Gemini AI (alt) (direct)");
+        }
+
+        $prompt = $this->buildPromptForAltVendorsOneMpn($currentVendorName, $productLine, $mpn, $quantity);
         $url = $this->buildUrl();
         $payload = $this->buildGenerationPayload($prompt);
 
@@ -290,38 +337,25 @@ PROMPT;
         while ($attempt < $maxAttempts) {
             $attempt++;
             $response = Http::timeout(60)->post($url, $payload);
-
             if (! $response->failed()) {
                 break;
             }
-
             $json = $response->json();
-            $err = is_array($json) && isset($json['error']['message'])
-                ? $json['error']['message']
-                : '';
-
-            $isQuota = $response->status() === 429
-                || (str_contains((string) $err, 'quota') && str_contains((string) $err, 'retry'));
-
+            $err = is_array($json) && isset($json['error']['message']) ? $json['error']['message'] : '';
+            $isQuota = $response->status() === 429 || (str_contains((string) $err, 'quota') && str_contains((string) $err, 'retry'));
             if ($isQuota && $attempt < $maxAttempts && preg_match('/retry in (\d+(?:\.\d+)?)\s*s/i', $err, $m)) {
-                $wait = (int) ceil((float) $m[1]);
-                $wait = min(max($wait, 5), 120);
+                $wait = min(max((int) ceil((float) $m[1]), 5), 120);
                 sleep($wait);
                 continue;
             }
-
             $emptyResult['error'] = $err ?: 'Gemini API request failed (HTTP '.$response->status().')';
-
             return $emptyResult;
         }
 
         if ($response->failed()) {
-            $json = $response->json();
-            $err = is_array($json) && isset($json['error']['message'])
-                ? $json['error']['message']
+            $emptyResult['error'] = is_array($response->json()) && isset($response->json()['error']['message'])
+                ? $response->json()['error']['message']
                 : 'Gemini API request failed (HTTP '.$response->status().')';
-            $emptyResult['error'] = $err;
-
             return $emptyResult;
         }
 
@@ -329,7 +363,6 @@ PROMPT;
         $text = $this->extractText($body);
         if ($text === null || $text === '') {
             $emptyResult['error'] = 'Gemini response did not include any text content';
-
             return $emptyResult;
         }
 
@@ -337,7 +370,6 @@ PROMPT;
         if (! is_array($parsed)) {
             $emptyResult['error'] = 'Gemini response was not valid JSON';
             $emptyResult['raw_text'] = $text;
-
             return $emptyResult;
         }
 
@@ -350,7 +382,7 @@ PROMPT;
                 }
                 $partNumber = trim((string) ($row['part_number'] ?? ''));
                 if ($partNumber === '') {
-                    continue;
+                    $partNumber = $mpn;
                 }
                 $vendors = [];
                 foreach ($row['vendors'] ?? [] as $alt) {
@@ -377,12 +409,72 @@ PROMPT;
             }
         }
 
-        return [
+        if ($altVendorResults === []) {
+            $altVendorResults[] = ['part_number' => $mpn, 'vendors' => []];
+        }
+
+        $result = [
             'success' => true,
             'alt_vendor_results' => $altVendorResults,
             'error' => null,
             'raw_text' => $text,
             'prompt' => $prompt,
+        ];
+        ResearchedMpn::setCached($mpn, ResearchedMpn::SOURCE_GEMINI, $result);
+        return $result;
+    }
+
+    /**
+     * Look up alternative vendors only via Gemini (no current vendor lookup).
+     * Calls Gemini once per MPN; cache_key in researched_mpn is the MPN so research can look up by cache_key/MPN.
+     *
+     * @param  array<int, string>  $mpns
+     * @return array{success: bool, alt_vendor_results: array, error: string|null, raw_text: string|null, prompt: string|null}
+     */
+    public function lookupAltVendorsOnly(string $currentVendorName, string $productLine, array $mpns, float $quantity, ?int $inventoryId = null): array
+    {
+        $emptyResult = [
+            'success' => false,
+            'alt_vendor_results' => [],
+            'error' => null,
+            'raw_text' => null,
+            'prompt' => null,
+        ];
+
+        if (! $this->isEnabled()) {
+            $emptyResult['error'] = 'Gemini disabled: missing GEMINI_API_KEY';
+            return $emptyResult;
+        }
+
+        if ($mpns === []) {
+            $emptyResult['success'] = true;
+            return $emptyResult;
+        }
+
+        $mergedAltVendorResults = [];
+        $anyError = null;
+        foreach ($mpns as $partNumber) {
+            $partNumber = trim((string) $partNumber);
+            if ($partNumber === '') {
+                continue;
+            }
+            $one = $this->lookupAltVendorsForOneMpn($currentVendorName, $productLine, $partNumber, $quantity, $inventoryId);
+            if (! empty($one['alt_vendor_results'])) {
+                foreach ($one['alt_vendor_results'] as $row) {
+                    $mergedAltVendorResults[] = $row;
+                }
+            }
+            if (! empty($one['error'])) {
+                $anyError = $one['error'];
+            }
+        }
+
+        return [
+            'success' => $anyError === null,
+            'alt_vendor_results' => $mergedAltVendorResults,
+            'error' => $anyError,
+            'raw_text' => null,
+            'prompt' => null,
         ];
     }
 
@@ -494,6 +586,20 @@ PROMPT;
         $decoded = json_decode($repaired, true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    protected function geminiCacheKey(string $vendorName, string $productLine, array $mpns, float $quantity, string $type): string
+    {
+        $sorted = $mpns;
+        sort($sorted);
+        $parts = [
+            trim($vendorName),
+            trim($productLine),
+            implode(',', array_map('trim', $sorted)),
+            (string) $quantity,
+            $type,
+        ];
+        return 'gemini:' . md5(implode('|', $parts));
     }
 
     /**

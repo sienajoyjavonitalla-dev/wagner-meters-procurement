@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\DTO\PriceFindingData;
+use App\Models\ResearchedMpn;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -31,14 +32,27 @@ class DigiKeyClient
      * When DigiKey returns 404 "Duplicate Products", pass manufacturerId (DigiKey's manufacturer ID) to disambiguate.
      *
      * @param  int|null  $manufacturerId  Optional. Use when part number matches multiple products (404 response asks for it).
+     * @param  int|null  $inventoryId  Optional. When set, logs "item_id X: DigiKey API" when making the request (for tail).
      * @return array<int, PriceFindingData>
      */
-    public function lookup(string $queryMpn, ?int $manufacturerId = null): array
+    public function lookup(string $queryMpn, ?int $manufacturerId = null, ?int $inventoryId = null): array
     {
+        $cacheKey = $this->cacheKey($queryMpn, $manufacturerId);
+        $cached = ResearchedMpn::getCached($cacheKey, ResearchedMpn::SOURCE_DIGIKEY);
+        if ($cached !== null) {
+            if ($inventoryId !== null) {
+                Log::info("item_id {$inventoryId}: DigiKey API (researched_mpn)");
+            }
+            return $this->findingsFromPayload($cached);
+        }
+
         $token = $this->getToken();
         if (! $token) {
-            Log::warning('DigiKey lookup skipped: failed to obtain access token.', ['mpn' => $queryMpn]);
             return [];
+        }
+
+        if ($inventoryId !== null) {
+            Log::info("item_id {$inventoryId}: DigiKey API (direct)");
         }
 
         $url = str_replace(
@@ -49,8 +63,6 @@ class DigiKeyClient
         if ($manufacturerId !== null) {
             $url .= (str_contains($url, '?') ? '&' : '?') . 'manufacturerId=' . (int) $manufacturerId;
         }
-
-        Log::info('DigiKey API request for MPN: '.$queryMpn.($manufacturerId !== null ? " (manufacturerId={$manufacturerId})" : ''));
 
         $response = Http::withHeaders($this->headers($token))
             ->timeout(20)
@@ -63,30 +75,38 @@ class DigiKeyClient
             $isDuplicate = $response->status() === 404
                 && (str_contains((string) $detail, 'Duplicate') || str_contains((string) $detail, 'manufacturerId'));
 
-            if ($isDuplicate) {
-                Log::warning('DigiKey returned 404: multiple products match this part number. Not an API key issue. Add manufacturerId to disambiguate (e.g. from DigiKey Manufacturers API or your data).', [
-                    'mpn' => $queryMpn,
-                    'status' => 404,
-                    'detail' => $detail,
-                ]);
-            } else {
-                Log::warning('DigiKey lookup failed.', [
-                    'mpn' => $queryMpn,
-                    'status' => $response->status(),
-                    'body' => mb_substr($body, 0, 500),
-                ]);
-            }
             return [];
         }
 
         $payload = $response->json();
-        Log::info('DigiKey API response', ['mpn' => $queryMpn, 'response' => $payload]);
+        if (is_array($payload)) {
+            $product = $payload['Product'] ?? null;
+            $url = is_array($product) ? $this->extractProductUrl($product) : null;
+            ResearchedMpn::setCached($cacheKey, ResearchedMpn::SOURCE_DIGIKEY, $payload, $url);
+        }
 
+        return $this->findingsFromPayload($payload ?? []);
+    }
+
+    protected function cacheKey(string $queryMpn, ?int $manufacturerId): string
+    {
+        $key = $queryMpn;
+        if ($manufacturerId !== null) {
+            $key .= '|mid=' . $manufacturerId;
+        }
+        return $key;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload  Raw DigiKey API response
+     * @return array<int, PriceFindingData>
+     */
+    protected function findingsFromPayload(array $payload): array
+    {
         $product = $payload['Product'] ?? null;
         if (! is_array($product)) {
             return [];
         }
-
         $price = $this->parseProductPrice($product);
         $priceBreaks = $this->extractPriceBreaks($product);
         $matchedMpn = trim((string) (
@@ -96,7 +116,6 @@ class DigiKeyClient
             ?? ''
         )) ?: null;
         $productUrl = $this->extractProductUrl($product);
-
         $currency = $this->config['locale_currency'] ?? 'USD';
         $finding = new PriceFindingData(
             provider: 'digikey',
@@ -106,7 +125,6 @@ class DigiKeyClient
             matchedMpn: $matchedMpn,
             productUrl: $productUrl
         );
-
         return [$finding];
     }
 
@@ -128,10 +146,6 @@ class DigiKeyClient
             ]);
 
         if ($response->failed()) {
-            Log::warning('DigiKey token request failed.', [
-                'status' => $response->status(),
-                'body' => mb_substr($response->body(), 0, 500),
-            ]);
             return null;
         }
 

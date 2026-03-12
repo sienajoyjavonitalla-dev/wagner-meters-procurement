@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\DTO\PriceFindingData;
 use App\Models\Inventory;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Tries to get current-vendor pricing from DigiKey or Mouser API when the inventory vendor matches.
@@ -41,16 +40,11 @@ class VendorApiResearchService
             return null;
         }
 
-        Log::info('VendorApiResearchService: Inventory has '.count($mpns).' MPN(s)', [
-            'inventory_id' => $inventory->id,
-            'mpns' => $mpns,
-        ]);
-
         if (str_contains($normalizedNoSpaces, 'digikey') || str_contains($normalized, 'digi-key') || str_contains($normalized, 'digi key')) {
-            return $this->lookupDigiKey($mpns, $quantity);
+            return $this->lookupDigiKey($mpns, $quantity, $inventory->id);
         }
         if (str_contains($normalized, 'mouser')) {
-            return $this->lookupMouser($mpns, $quantity);
+            return $this->lookupMouser($mpns, $quantity, $inventory->id);
         }
 
         return null;
@@ -84,7 +78,7 @@ class VendorApiResearchService
      * @param  array<int, string>  $mpns
      * @return array{success: true, current_vendor_results: array, current_vendor_currency: string, alt_vendor_results: array, source: string}|null
      */
-    protected function lookupDigiKey(array $mpns, float $quantity): ?array
+    protected function lookupDigiKey(array $mpns, float $quantity, int $inventoryId): ?array
     {
         if (! $this->digiKey->isEnabled()) {
             return null;
@@ -92,22 +86,16 @@ class VendorApiResearchService
 
         $currentVendorResults = [];
         $currency = 'USD';
-        $total = count($mpns);
 
-        // Try every MPN and save price/URL for each that returns a result (no early exit).
         foreach ($mpns as $index => $partNumber) {
             $partNumber = trim((string) $partNumber);
             if ($partNumber === '') {
                 continue;
             }
-            $n = $index + 1;
-            Log::info("VendorApiResearchService: DigiKey MPN ({$n}/{$total}): {$partNumber}");
-
-            $findings = $this->digiKey->lookup($partNumber);
+            $findings = $this->digiKey->lookup($partNumber, null, $inventoryId);
             $finding = $this->bestMatchingFinding($findings, $partNumber);
 
             if ($finding === null) {
-                Log::info("VendorApiResearchService: DigiKey MPN {$partNumber}: 0 results, trying next MPN");
                 continue;
             }
             $unitPrice = self::priceForQuantity($finding->priceBreaks, $quantity);
@@ -123,28 +111,18 @@ class VendorApiResearchService
                 if ($finding->currency !== null) {
                     $currency = $finding->currency;
                 }
-                $urlPreview = $finding->productUrl !== null ? mb_substr($finding->productUrl, 0, 80) . (mb_strlen($finding->productUrl) > 80 ? '...' : '') : null;
-                Log::info("VendorApiResearchService: DigiKey MPN {$partNumber}: 1 result (saved for current vendor)", [
-                    'unit_price' => $unitPrice,
-                    'url' => $urlPreview,
-                ]);
             }
         }
 
         if ($currentVendorResults === []) {
-            Log::warning('VendorApiResearchService: DigiKey returned no results for any MPN');
             return null;
         }
-
-        Log::info('VendorApiResearchService: DigiKey current_vendor_results (all MPNs with API results)', [
-            'part_numbers' => array_column($currentVendorResults, 'part_number'),
-        ]);
 
         $result = [
             'success' => true,
             'current_vendor_results' => $currentVendorResults,
             'current_vendor_currency' => $currency,
-            'alt_vendor_results' => $this->fetchAltVendorsFromApis($mpns, $quantity, 'digikey'),
+            'alt_vendor_results' => $this->fetchAltVendorsFromApis($mpns, $quantity, 'digikey', $inventoryId),
             'source' => 'digikey_api',
         ];
         return $result;
@@ -154,7 +132,7 @@ class VendorApiResearchService
      * @param  array<int, string>  $mpns
      * @return array{success: true, current_vendor_results: array, current_vendor_currency: string, alt_vendor_results: array, source: string}|null
      */
-    protected function lookupMouser(array $mpns, float $quantity): ?array
+    protected function lookupMouser(array $mpns, float $quantity, int $inventoryId): ?array
     {
         if (! $this->mouser->isEnabled()) {
             return null;
@@ -162,22 +140,16 @@ class VendorApiResearchService
 
         $currentVendorResults = [];
         $currency = 'USD';
-        $total = count($mpns);
 
-        // Try every MPN and save price/URL for each that returns a result (no early exit).
         foreach ($mpns as $index => $partNumber) {
             $partNumber = trim((string) $partNumber);
             if ($partNumber === '') {
                 continue;
             }
-            $n = $index + 1;
-            Log::info("VendorApiResearchService: Mouser MPN ({$n}/{$total}): {$partNumber}");
-
-            $findings = $this->mouser->lookup($partNumber);
+            $findings = $this->mouser->lookup($partNumber, $inventoryId);
             $finding = $this->bestMatchingFinding($findings, $partNumber);
 
             if ($finding === null) {
-                Log::info("VendorApiResearchService: Mouser MPN {$partNumber}: 0 results, trying next MPN");
                 continue;
             }
             $unitPrice = self::priceForQuantity($finding->priceBreaks, $quantity);
@@ -193,28 +165,18 @@ class VendorApiResearchService
                 if ($finding->currency !== null) {
                     $currency = $finding->currency;
                 }
-                $urlPreview = $finding->productUrl !== null ? mb_substr($finding->productUrl, 0, 80) . (mb_strlen($finding->productUrl) > 80 ? '...' : '') : null;
-                Log::info("VendorApiResearchService: Mouser MPN {$partNumber}: 1 result (saved for current vendor)", [
-                    'unit_price' => $unitPrice,
-                    'url' => $urlPreview,
-                ]);
             }
         }
 
         if ($currentVendorResults === []) {
-            Log::warning('VendorApiResearchService: Mouser returned no results for any MPN');
             return null;
         }
-
-        Log::info('VendorApiResearchService: Mouser current_vendor_results (all MPNs with API results)', [
-            'part_numbers' => array_column($currentVendorResults, 'part_number'),
-        ]);
 
         $result = [
             'success' => true,
             'current_vendor_results' => $currentVendorResults,
             'current_vendor_currency' => $currency,
-            'alt_vendor_results' => $this->fetchAltVendorsFromApis($mpns, $quantity, 'mouser'),
+            'alt_vendor_results' => $this->fetchAltVendorsFromApis($mpns, $quantity, 'mouser', $inventoryId),
             'source' => 'mouser_api',
         ];
         return $result;
@@ -228,9 +190,10 @@ class VendorApiResearchService
      * - Current = other → this returns DigiKey + Mouser (Gemini adds others).
      *
      * @param  array<int, string>  $mpns
+     * @param  int|null  $inventoryId  Optional. When set, logs "item_id X: DigiKey/Mouser API" when making requests.
      * @return array<int, array{part_number: string, vendors: array<int, array{vendor_name: string, unit_price: float, url: string|null}>}>
      */
-    public function fetchAltVendorsFromApis(array $mpns, float $quantity, string $currentVendorName): array
+    public function fetchAltVendorsFromApis(array $mpns, float $quantity, string $currentVendorName, ?int $inventoryId = null): array
     {
         $normalized = strtolower(trim($currentVendorName));
         $normalizedNoSpaces = str_replace(' ', '', $normalized);
@@ -246,7 +209,7 @@ class VendorApiResearchService
             $vendors = [];
 
             if ($callDigiKey && $this->digiKey->isEnabled()) {
-                $findings = $this->digiKey->lookup($partNumber);
+                $findings = $this->digiKey->lookup($partNumber, null, $inventoryId);
                 $finding = $this->bestMatchingFinding($findings, $partNumber);
                 if ($finding !== null) {
                     $unitPrice = self::priceForQuantity($finding->priceBreaks, $quantity) ?? $finding->minUnitPrice;
@@ -261,7 +224,7 @@ class VendorApiResearchService
             }
 
             if ($callMouser && $this->mouser->isEnabled()) {
-                $findings = $this->mouser->lookup($partNumber);
+                $findings = $this->mouser->lookup($partNumber, $inventoryId);
                 $finding = $this->bestMatchingFinding($findings, $partNumber);
                 if ($finding !== null) {
                     $unitPrice = self::priceForQuantity($finding->priceBreaks, $quantity) ?? $finding->minUnitPrice;

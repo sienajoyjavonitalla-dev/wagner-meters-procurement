@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\DTO\PriceFindingData;
+use App\Models\ResearchedMpn;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -27,18 +28,29 @@ class MouserClient
     /**
      * Search by part number. Returns up to 3 normalized findings.
      *
+     * @param  int|null  $inventoryId  Optional. When set, logs "item_id X: Mouser API" when making the request (for tail).
      * @return array<int, PriceFindingData>
      */
-    public function lookup(string $queryMpn): array
+    public function lookup(string $queryMpn, ?int $inventoryId = null): array
     {
         if (! $this->isEnabled()) {
             return [];
         }
 
+        $cached = ResearchedMpn::getCached($queryMpn, ResearchedMpn::SOURCE_MOUSER);
+        if ($cached !== null) {
+            if ($inventoryId !== null) {
+                Log::info("item_id {$inventoryId}: Mouser API (researched_mpn)");
+            }
+            return $this->findingsFromPayload($cached);
+        }
+
+        if ($inventoryId !== null) {
+            Log::info("item_id {$inventoryId}: Mouser API (direct)");
+        }
+
         $url = $this->config['search_url'] ?? '';
         $url = str_contains($url, '?') ? $url . '&apiKey=' . urlencode($this->config['api_key']) : $url . '?apiKey=' . urlencode($this->config['api_key']);
-
-        Log::info("Mouser API request for MPN: {$queryMpn}");
 
         $response = Http::timeout(20)
             ->post($url, [
@@ -49,27 +61,30 @@ class MouserClient
             ]);
 
         if ($response->failed()) {
-            $body = $response->body();
-            $decoded = $response->json();
-            $bodyPreview = $decoded !== null
-                ? json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
-                : mb_substr($body, 0, 1000);
-            Log::warning("Mouser API request failed for MPN: {$queryMpn}", [
-                'status' => $response->status(),
-                'response_body' => $bodyPreview,
-            ]);
             return [];
         }
 
         $payload = $response->json();
-        $pretty = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        Log::info("Mouser API response for MPN: {$queryMpn}\n{$pretty}");
+        if (is_array($payload)) {
+            $parts = $payload['SearchResults']['Parts'] ?? [];
+            $firstPart = is_array($parts) && isset($parts[0]) ? $parts[0] : null;
+            $url = is_array($firstPart) ? $this->extractProductUrl($firstPart) : null;
+            ResearchedMpn::setCached($queryMpn, ResearchedMpn::SOURCE_MOUSER, $payload, $url);
+        }
 
+        return $this->findingsFromPayload($payload ?? []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload  Raw Mouser API response
+     * @return array<int, PriceFindingData>
+     */
+    protected function findingsFromPayload(array $payload): array
+    {
         $parts = $payload['SearchResults']['Parts'] ?? [];
         if (! is_array($parts)) {
             return [];
         }
-
         $findings = [];
         foreach (array_slice($parts, 0, 3) as $part) {
             if (! is_array($part)) {
@@ -79,7 +94,6 @@ class MouserClient
             $minPrice = $this->minPriceFromBreaks($priceBreaks);
             $matchedMpn = trim((string) ($part['ManufacturerPartNumber'] ?? $part['MouserPartNumber'] ?? '')) ?: null;
             $productUrl = $this->extractProductUrl($part);
-
             $findings[] = new PriceFindingData(
                 provider: 'mouser',
                 currency: $minPrice !== null ? 'USD' : null,
@@ -89,7 +103,6 @@ class MouserClient
                 productUrl: $productUrl
             );
         }
-
         return $findings;
     }
 

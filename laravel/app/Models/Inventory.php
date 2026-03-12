@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Inventory extends Model
 {
@@ -58,8 +59,8 @@ class Inventory extends Model
         return $this->hasMany(Mpn::class);
     }
 
-    public function altVendors(): HasMany
+    public function altVendors(): HasManyThrough
     {
-        return $this->hasMany(AltVendor::class, 'inventory_id');
+        return $this->hasManyThrough(AltVendor::class, Mpn::class, 'inventory_id', 'mpn_id');
     }
 }

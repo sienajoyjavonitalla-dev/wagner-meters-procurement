@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AltVendor extends Model
 {
     protected $fillable = [
-        'inventory_id',
+        'mpn_id',
         'vendor_name',
         'unit_price',
         'url',
@@ -23,8 +23,8 @@ class AltVendor extends Model
         ];
     }
 
-    public function inventory(): BelongsTo
+    public function mpn(): BelongsTo
     {
-        return $this->belongsTo(Inventory::class);
+        return $this->belongsTo(Mpn::class);
     }
 }

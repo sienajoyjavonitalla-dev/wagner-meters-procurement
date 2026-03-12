@@ -35,16 +35,28 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const COLUMNS = [
   { key: 'item_id', header: 'Item ID', accessor: (r) => r.item_id ?? '' },
-  { key: 'vendor_name', header: 'Current vendor', accessor: (r) => r.vendor_name ?? '' },
-  { key: 'unit_cost', header: 'Current unit cost', accessor: (r) => formatNum(r.unit_cost) },
-  { key: 'quantity', header: 'Quantity', accessor: (r) => r.quantity ?? '' },
-  { key: 'lowest_current_vendor_price', header: 'Lowest price (current vendor)', accessor: (r) => formatNum(r.lowest_current_vendor_price) },
-  { key: 'current_vendor_link', header: 'Current vendor (link)', accessor: (r) => r.current_vendor_name ?? '—' },
-  { key: 'savings_vs_current_vendor', header: 'Savings vs current vendor', accessor: (r) => formatSavings(r.savings_vs_current_vendor) },
-  { key: 'lowest_alt_vendor_price', header: 'Lowest price (alt vendor)', accessor: (r) => formatNum(r.lowest_alt_vendor_price) },
-  { key: 'lowest_alt_vendor_name', header: 'Alt vendor (link)', accessor: (r) => r.lowest_alt_vendor_name ?? '—' },
-  { key: 'savings_vs_alt_vendor', header: 'Savings vs alt vendor', accessor: (r) => formatSavings(r.savings_vs_alt_vendor) },
+  { key: 'mpn_list', header: 'MPN', accessor: (r) => r.mpn_list ?? '' },
+  { key: 'unit_cost', header: 'Unit cost', accessor: (r) => formatNum(r.unit_cost) },
+  { key: 'quantity', header: 'Quantity', accessor: (r) => (r.quantity != null && r.quantity !== '') ? Math.round(Number(r.quantity)).toLocaleString() : '' },
+  { key: 'ext_cost', header: 'Total Cost', accessor: (r) => formatNum(r.ext_cost) },
+  { key: 'current_vendor_link', header: 'Vendor', accessor: (r) => r.current_vendor_name ?? '—' },
+  { key: 'lowest_current_vendor_price', header: 'Current Site Price', accessor: (r) => formatNum(r.lowest_current_vendor_price) },
+  { key: 'savings_vs_current_vendor', header: 'Savings vs Total Cost', accessor: (r) => formatSavings(r.savings_vs_current_vendor) },
+  { key: 'lowest_alt_vendor_name', header: 'Vendor', accessor: (r) => r.lowest_alt_vendor_name ?? '—' },
+  { key: 'lowest_alt_vendor_price', header: 'Lowest Price', accessor: (r) => formatNum(r.lowest_alt_vendor_price) },
+  { key: 'savings_vs_alt_vendor', header: 'Savings vs Total Cost', accessor: (r) => formatSavings(r.savings_vs_alt_vendor) },
+  { key: 'alt_vendors_view', header: '', accessor: () => '', skipExport: true },
 ];
+
+const TABLE_STYLES = {
+  cellBase: { padding: '0.5rem 0.75rem' },
+  borderVertical: { borderLeft: '2px solid #30363d' },
+  headerCell: { textAlign: 'left', padding: '0.5rem 0.75rem', fontWeight: 600, color: '#8b949e', background: '#161b22' },
+  mainHeaderCell: { textAlign: 'center', padding: '0.5rem 0.75rem', fontWeight: 700, color: '#e6edf3', background: '#21262d', borderBottom: '1px solid #30363d' },
+};
+const ITEM_COLS = 5;
+const CURRENT_VENDOR_COLS = 3;
+const ALT_VENDOR_COLS = 4;
 
 export default function PriceComparison() {
   const [data, setData] = useState([]);
@@ -55,6 +67,7 @@ export default function PriceComparison() {
   const [minSavingsFilter, setMinSavingsFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE);
+  const [altVendorsModalRow, setAltVendorsModalRow] = useState(null);
 
   useEffect(() => {
     setPage(1);
@@ -111,7 +124,8 @@ export default function PriceComparison() {
   };
 
   const handleExportCSV = () => {
-    downloadCSV('price-comparison.csv', toCSV(filtered, COLUMNS));
+    const exportCols = COLUMNS.filter((c) => !c.skipExport);
+    downloadCSV('price-comparison.csv', toCSV(filtered, exportCols));
   };
 
   if (loading) {
@@ -211,9 +225,26 @@ export default function PriceComparison() {
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e6edf3', fontSize: '0.875rem' }}>
           <thead>
+            <tr>
+              <th colSpan={ITEM_COLS} style={{ ...TABLE_STYLES.mainHeaderCell }}>
+                Item
+              </th>
+              <th colSpan={CURRENT_VENDOR_COLS} style={{ ...TABLE_STYLES.mainHeaderCell, ...TABLE_STYLES.borderVertical }}>
+                Current Vendor
+              </th>
+              <th colSpan={ALT_VENDOR_COLS} style={{ ...TABLE_STYLES.mainHeaderCell, ...TABLE_STYLES.borderVertical }}>
+                Alternative Vendor with Lowest Price
+              </th>
+            </tr>
             <tr style={{ borderBottom: '1px solid #30363d' }}>
-              {COLUMNS.map((c) => (
-                <th key={c.key} style={{ textAlign: 'left', padding: '0.5rem 0.75rem', fontWeight: 600, color: '#8b949e' }}>
+              {COLUMNS.map((c, idx) => (
+                <th
+                  key={c.key}
+                  style={{
+                    ...TABLE_STYLES.headerCell,
+                    ...(idx === ITEM_COLS || idx === ITEM_COLS + CURRENT_VENDOR_COLS ? TABLE_STYLES.borderVertical : {}),
+                  }}
+                >
                   {c.header}
                 </th>
               ))}
@@ -229,11 +260,22 @@ export default function PriceComparison() {
             ) : (
               paginatedRows.map((row) => (
                 <tr key={row.inventory_id} style={{ borderBottom: '1px solid #30363d' }}>
-                  {COLUMNS.map((c) => {
+                  {COLUMNS.map((c, idx) => {
+                    const cellStyle = {
+                      ...TABLE_STYLES.cellBase,
+                      ...(idx === ITEM_COLS || idx === ITEM_COLS + CURRENT_VENDOR_COLS ? TABLE_STYLES.borderVertical : {}),
+                    };
+                    if (c.key === 'mpn_list') {
+                      return (
+                        <td key={c.key} style={{ ...cellStyle, whiteSpace: 'pre-line' }}>
+                          {row.mpn_list ?? '—'}
+                        </td>
+                      );
+                    }
                     if (c.key === 'current_vendor_link') {
                       const url = row.current_vendor_url;
                       return (
-                        <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
+                        <td key={c.key} style={cellStyle}>
                           {url ? (
                             <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>
                               {row.current_vendor_name || 'Link'}
@@ -248,7 +290,7 @@ export default function PriceComparison() {
                       const url = row.lowest_alt_vendor_url;
                       const name = row.lowest_alt_vendor_name;
                       return (
-                        <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
+                        <td key={c.key} style={cellStyle}>
                           {url ? (
                             <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>
                               {name || 'Link'}
@@ -259,8 +301,37 @@ export default function PriceComparison() {
                         </td>
                       );
                     }
+                    if (c.key === 'alt_vendors_view') {
+                      const altVendors = row.alt_vendors ?? [];
+                      return (
+                        <td key={c.key} style={cellStyle}>
+                          {altVendors.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setAltVendorsModalRow(row)}
+                              title="View all alternative vendors"
+                              style={{
+                                padding: '0.25rem',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#8b949e',
+                                borderRadius: 4,
+                              }}
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            </button>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      );
+                    }
                     return (
-                      <td key={c.key} style={{ padding: '0.5rem 0.75rem' }}>
+                      <td key={c.key} style={cellStyle}>
                         {c.accessor(row)}
                       </td>
                     );
@@ -271,6 +342,92 @@ export default function PriceComparison() {
           </tbody>
         </table>
       </div>
+
+      {altVendorsModalRow && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="alt-vendors-modal-title"
+          onClick={() => setAltVendorsModalRow(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#161b22',
+              border: '1px solid #30363d',
+              borderRadius: 8,
+              maxWidth: 480,
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 id="alt-vendors-modal-title" style={{ margin: 0, fontSize: '1.125rem', color: '#e6edf3' }}>
+                Alternative vendors {altVendorsModalRow.item_id ? `— ${altVendorsModalRow.item_id}` : ''}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setAltVendorsModalRow(null)}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  background: '#21262d',
+                  border: '1px solid #30363d',
+                  borderRadius: 6,
+                  color: '#e6edf3',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div style={{ padding: '1rem 1.25rem' }}>
+              {(altVendorsModalRow.alt_vendors ?? []).length === 0 ? (
+                <p style={{ margin: 0, color: '#8b949e' }}>No alternative vendors.</p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', color: '#e6edf3' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #30363d' }}>
+                      <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>Vendor</th>
+                      <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>Price</th>
+                      <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e', fontWeight: 600 }}>Savings</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {altVendorsModalRow.alt_vendors.map((av, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #30363d' }}>
+                        <td style={{ padding: '0.5rem 0.75rem' }}>
+                          {av.url ? (
+                            <a href={av.url} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>
+                              {av.vendor_name || '—'}
+                            </a>
+                          ) : (
+                            av.vendor_name || '—'
+                          )}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>{formatNum(av.unit_price)}</td>
+                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>{formatSavings(av.savings)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1rem', padding: '0.5rem 0' }}>
         <p style={{ margin: 0, color: '#8b949e', fontSize: '0.8125rem' }}>

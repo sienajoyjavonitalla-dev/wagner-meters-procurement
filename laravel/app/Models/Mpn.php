@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Mpn extends Model
 {
@@ -15,6 +16,7 @@ class Mpn extends Model
         'unit_price',
         'price_fetched_at',
         'currency',
+        'url',
     ];
 
     protected function casts(): array
@@ -28,5 +30,10 @@ class Mpn extends Model
     public function inventory(): BelongsTo
     {
         return $this->belongsTo(Inventory::class);
+    }
+
+    public function altVendors(): HasMany
+    {
+        return $this->hasMany(AltVendor::class);
     }
 }

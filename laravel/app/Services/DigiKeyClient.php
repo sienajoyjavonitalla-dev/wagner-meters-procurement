@@ -28,10 +28,12 @@ class DigiKeyClient
 
     /**
      * Look up product by manufacturer part number. Returns one normalized finding or empty array.
+     * When DigiKey returns 404 "Duplicate Products", pass manufacturerId (DigiKey's manufacturer ID) to disambiguate.
      *
+     * @param  int|null  $manufacturerId  Optional. Use when part number matches multiple products (404 response asks for it).
      * @return array<int, PriceFindingData>
      */
-    public function lookup(string $queryMpn): array
+    public function lookup(string $queryMpn, ?int $manufacturerId = null): array
     {
         $token = $this->getToken();
         if (! $token) {
@@ -44,21 +46,42 @@ class DigiKeyClient
             rawurlencode($queryMpn),
             $this->config['product_url'] ?? ''
         );
+        if ($manufacturerId !== null) {
+            $url .= (str_contains($url, '?') ? '&' : '?') . 'manufacturerId=' . (int) $manufacturerId;
+        }
+
+        Log::info('DigiKey API request for MPN: '.$queryMpn.($manufacturerId !== null ? " (manufacturerId={$manufacturerId})" : ''));
 
         $response = Http::withHeaders($this->headers($token))
             ->timeout(20)
             ->get($url);
 
         if ($response->failed()) {
-            Log::warning('DigiKey lookup failed.', [
-                'mpn' => $queryMpn,
-                'status' => $response->status(),
-                'body' => mb_substr($response->body(), 0, 500),
-            ]);
+            $body = $response->body();
+            $decoded = $response->json();
+            $detail = is_array($decoded) ? ($decoded['detail'] ?? '') : '';
+            $isDuplicate = $response->status() === 404
+                && (str_contains((string) $detail, 'Duplicate') || str_contains((string) $detail, 'manufacturerId'));
+
+            if ($isDuplicate) {
+                Log::warning('DigiKey returned 404: multiple products match this part number. Not an API key issue. Add manufacturerId to disambiguate (e.g. from DigiKey Manufacturers API or your data).', [
+                    'mpn' => $queryMpn,
+                    'status' => 404,
+                    'detail' => $detail,
+                ]);
+            } else {
+                Log::warning('DigiKey lookup failed.', [
+                    'mpn' => $queryMpn,
+                    'status' => $response->status(),
+                    'body' => mb_substr($body, 0, 500),
+                ]);
+            }
             return [];
         }
 
         $payload = $response->json();
+        Log::info('DigiKey API response', ['mpn' => $queryMpn, 'response' => $payload]);
+
         $product = $payload['Product'] ?? null;
         if (! is_array($product)) {
             return [];
@@ -72,6 +95,7 @@ class DigiKeyClient
             ?? $product['DigiKeyProductNumber']
             ?? ''
         )) ?: null;
+        $productUrl = $this->extractProductUrl($product);
 
         $currency = $this->config['locale_currency'] ?? 'USD';
         $finding = new PriceFindingData(
@@ -79,7 +103,8 @@ class DigiKeyClient
             currency: $price !== null ? $currency : null,
             priceBreaks: $priceBreaks,
             minUnitPrice: $price,
-            matchedMpn: $matchedMpn
+            matchedMpn: $matchedMpn,
+            productUrl: $productUrl
         );
 
         return [$finding];
@@ -201,6 +226,15 @@ class DigiKeyClient
         if (is_string($value)) {
             $cleaned = str_replace([',', '$'], '', trim($value));
             return $cleaned !== '' && is_numeric($cleaned) ? (float) $cleaned : null;
+        }
+        return null;
+    }
+
+    protected function extractProductUrl(array $product): ?string
+    {
+        $url = $product['ProductUrl'] ?? $product['DetailUrl'] ?? $product['PrimaryPhoto'] ?? $product['ProductLink'] ?? $product['Url'] ?? null;
+        if (is_string($url) && trim($url) !== '') {
+            return trim($url);
         }
         return null;
     }

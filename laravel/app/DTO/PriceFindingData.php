@@ -15,6 +15,7 @@ final readonly class PriceFindingData
         public array $priceBreaks,
         public ?float $minUnitPrice,
         public ?string $matchedMpn = null,
+        public ?string $productUrl = null,
     ) {
     }
 

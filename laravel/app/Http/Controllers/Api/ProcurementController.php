@@ -187,6 +187,7 @@ class ProcurementController extends Controller
 
         $inventories = Inventory::query()
             ->where('data_import_id', $importId)
+            ->whereNotNull('research_completed_at')
             ->with(['mpns', 'altVendors'])
             ->orderBy('id')
             ->get();
@@ -194,29 +195,48 @@ class ProcurementController extends Controller
         $data = [];
         foreach ($inventories as $inv) {
             $currentCost = (float) ($inv->unit_cost ?? 0);
-            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
-            $lowestMpnVal = $lowestMpn !== null ? (float) $lowestMpn : null;
+            $mpnsWithPrice = $inv->mpns->whereNotNull('unit_price');
+            $lowestMpnVal = $mpnsWithPrice->isEmpty() ? null : (float) $mpnsWithPrice->min('unit_price');
             $currentVendorName = (string) ($inv->vendor_name ?? '');
-            $gemini = $inv->gemini_response_json;
-            $currentVendorUrl = is_array($gemini) ? ($gemini['current_vendor_url'] ?? null) : null;
+            $lowestMpnRow = $inv->mpns->whereNotNull('unit_price')->sortBy('unit_price')->first();
+            $rawUrl = $lowestMpnRow?->url;
+            $currentVendorUrl = ($rawUrl !== null && trim((string) $rawUrl) !== '') ? trim((string) $rawUrl) : null;
 
             $lowestAlt = $inv->altVendors->sortBy('unit_price')->first();
             $lowestAltPrice = $lowestAlt ? (float) $lowestAlt->unit_price : null;
             $lowestAltVendorName = $lowestAlt ? (string) $lowestAlt->vendor_name : null;
-            $lowestAltUrl = $lowestAlt ? (string) ($lowestAlt->url ?? '') : null;
+            $rawAltUrl = $lowestAlt ? ($lowestAlt->url ?? null) : null;
+            $lowestAltUrl = ($rawAltUrl !== null && trim((string) $rawAltUrl) !== '') ? trim((string) $rawAltUrl) : null;
 
-            $savingsVsCurrent = ($lowestMpnVal !== null && $currentCost > $lowestMpnVal)
-                ? round($currentCost - $lowestMpnVal, 4) : null;
-            $savingsVsAlt = ($lowestAltPrice !== null && $currentCost > $lowestAltPrice)
-                ? round($currentCost - $lowestAltPrice, 4) : null;
+            $quantity = (float) ($inv->quantity ?? 0);
+            $extCost = (float) ($inv->ext_cost ?? 0);
+            $savingsVsCurrent = ($lowestMpnVal !== null && $quantity > 0)
+                ? round($extCost - ($lowestMpnVal * $quantity), 4) : null;
+            $savingsVsAlt = ($lowestAltPrice !== null && $quantity > 0)
+                ? round($extCost - ($lowestAltPrice * $quantity), 4) : null;
+
+            $mpnList = $inv->mpns->pluck('part_number')->filter()->values()->implode("\n");
+
+            $allAltVendors = $inv->altVendors->sortBy('unit_price')->values()->map(function ($av) use ($extCost, $quantity) {
+                $up = (float) ($av->unit_price ?? 0);
+                $savings = ($quantity > 0) ? round($extCost - ($up * $quantity), 4) : null;
+                return [
+                    'vendor_name' => (string) ($av->vendor_name ?? ''),
+                    'unit_price' => $up,
+                    'url' => ($av->url && trim((string) $av->url) !== '') ? trim((string) $av->url) : null,
+                    'savings' => $savings,
+                ];
+            })->all();
 
             $data[] = [
                 'inventory_id' => $inv->id,
                 'item_id' => $inv->item_id,
                 'description' => $inv->description,
                 'vendor_name' => $currentVendorName,
+                'mpn_list' => $mpnList,
                 'unit_cost' => $currentCost,
                 'quantity' => $inv->quantity,
+                'ext_cost' => $extCost,
                 'lowest_current_vendor_price' => $lowestMpnVal,
                 'current_vendor_name' => $currentVendorName,
                 'current_vendor_url' => $currentVendorUrl,
@@ -225,6 +245,7 @@ class ProcurementController extends Controller
                 'lowest_alt_vendor_name' => $lowestAltVendorName,
                 'lowest_alt_vendor_url' => $lowestAltUrl ?: null,
                 'savings_vs_alt_vendor' => $savingsVsAlt,
+                'alt_vendors' => $allAltVendors,
             ];
         }
 

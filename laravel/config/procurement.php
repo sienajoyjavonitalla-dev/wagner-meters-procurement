@@ -40,9 +40,9 @@ return [
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
-        // Use v1 (stable) for generateContent; v1beta can return "model not found" for some model IDs
-        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1'),
-        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        // Free tier: gemini-2.5-flash-lite (15 RPM). If unavailable try gemini-2.5-flash or gemini-2.0-flash-lite.
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
         'max_output_tokens' => (int) env('GEMINI_MAX_OUTPUT_TOKENS', 2048),
     ],
 

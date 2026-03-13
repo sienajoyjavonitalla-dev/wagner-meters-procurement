@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Cache of API/AI responses keyed by cache_key + source so we avoid repeated calls.
  * - DigiKey/Mouser: cache_key = part_number (one row per MPN per source).
- * - Gemini: cache_key = hash(vendor, product_line, sorted_mpns, quantity, type).
+ * - Gemini: cache_key = MPN only. response_json = { "vendors": [ { "vendor_name", "url", "price_breaks": [ { "quantity", "unit_price" } ] } ] }.
+ *   One row per MPN; any quantity/vendor can reuse (no separate current vs alt in JSON).
  */
 class ResearchedMpn extends Model
 {
@@ -30,6 +31,7 @@ class ResearchedMpn extends Model
     public const SOURCE_DIGIKEY = 'digikey';
     public const SOURCE_MOUSER = 'mouser';
     public const SOURCE_GEMINI = 'gemini';
+    public const SOURCE_ELEMENT14 = 'element14';
 
     public static function getCached(string $cacheKey, string $source): ?array
     {

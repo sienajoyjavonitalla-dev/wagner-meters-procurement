@@ -46,169 +46,60 @@ class GeminiResearchService
         $emptyResult = [
             'success' => false,
             'current_vendor_results' => [],
-            'current_vendor_currency' => null,
+            'current_vendor_currency' => 'USD',
             'alt_vendor_results' => [],
             'error' => null,
             'raw_text' => null,
         ];
 
-        if (! $this->isEnabled()) {
-            $emptyResult['error'] = 'Gemini disabled: missing GEMINI_API_KEY';
-
+        $mpns = array_filter(array_map('trim', $mpns));
+        if ($mpns === []) {
+            $emptyResult['error'] = 'No MPNs provided';
             return $emptyResult;
         }
-
-        $cacheKey = $this->geminiCacheKey($vendorName, $productLine, $mpns, $quantity, 'full');
-        $cached = ResearchedMpn::getCached($cacheKey, ResearchedMpn::SOURCE_GEMINI);
-        if ($cached !== null && ! empty($cached['success'])) {
-            if ($inventoryId !== null) {
-                Log::info("item_id {$inventoryId}: Gemini AI (full) (researched_mpn)");
-            }
-            $cached['prompt'] = $cached['prompt'] ?? null;
-            return $cached;
-        }
-
-        if ($inventoryId !== null) {
-            Log::info("item_id {$inventoryId}: Gemini AI (full) (direct)");
-        }
-
-        $prompt = $this->buildPrompt($vendorName, $productLine, $mpns, $quantity);
-        $emptyResult['prompt'] = $prompt;
-        $url = $this->buildUrl();
-        $payload = $this->buildGenerationPayload($prompt);
-
-        $maxAttempts = 3;
-        $attempt = 0;
-        $response = null;
-
-        while ($attempt < $maxAttempts) {
-            $attempt++;
-            $response = Http::timeout(60)->post($url, $payload);
-
-            if (! $response->failed()) {
-                break;
-            }
-
-            $json = $response->json();
-            $err = is_array($json) && isset($json['error']['message'])
-                ? $json['error']['message']
-                : '';
-
-            $isQuota = $response->status() === 429
-                || (str_contains((string) $err, 'quota') && str_contains((string) $err, 'retry'));
-
-            if ($isQuota && $attempt < $maxAttempts && preg_match('/retry in (\d+(?:\.\d+)?)\s*s/i', $err, $m)) {
-                $wait = (int) ceil((float) $m[1]);
-                $wait = min(max($wait, 5), 120);
-                sleep($wait);
-                continue;
-            }
-
-            $emptyResult['error'] = $err ?: 'Gemini API request failed (HTTP '.$response->status().')';
-
-            return $emptyResult;
-        }
-
-        if ($response->failed()) {
-            $json = $response->json();
-            $err = is_array($json) && isset($json['error']['message'])
-                ? $json['error']['message']
-                : 'Gemini API request failed (HTTP '.$response->status().')';
-            $emptyResult['error'] = $err;
-
-            return $emptyResult;
-        }
-
-        $body = $response->json();
-        $text = $this->extractText($body);
-        if ($text === null || $text === '') {
-            $emptyResult['error'] = 'Gemini response did not include any text content';
-
-            return $emptyResult;
-        }
-
-        $parsed = $this->parseJsonResponse($text);
-        if (! is_array($parsed)) {
-            $emptyResult['error'] = 'Gemini response was not valid JSON';
-            $emptyResult['raw_text'] = $text;
-
-            return $emptyResult;
-        }
-
-        $currency = isset($parsed['current_vendor_currency']) && trim((string) $parsed['current_vendor_currency']) !== ''
-            ? trim((string) $parsed['current_vendor_currency'])
-            : 'USD';
 
         $currentVendorResults = [];
-        $rawCurrent = $parsed['current_vendor_results'] ?? [];
-        if (is_array($rawCurrent)) {
-            foreach ($rawCurrent as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-                $partNumber = trim((string) ($row['part_number'] ?? ''));
-                if ($partNumber === '') {
-                    continue;
-                }
-                $price = $this->toFloat($row['unit_price'] ?? null);
-                $url = isset($row['url']) && trim((string) $row['url']) !== ''
-                    ? trim((string) $row['url'])
-                    : null;
-                $currentVendorResults[] = [
-                    'part_number' => $partNumber,
-                    'unit_price' => $price,
-                    'url' => $url,
-                ];
-            }
-        }
-
         $altVendorResults = [];
-        $rawAltResults = $parsed['alt_vendor_results'] ?? [];
-        if (is_array($rawAltResults)) {
-            foreach ($rawAltResults as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-                $partNumber = trim((string) ($row['part_number'] ?? ''));
-                if ($partNumber === '') {
-                    continue;
-                }
-                $vendors = [];
-                foreach ($row['vendors'] ?? [] as $alt) {
-                    if (! is_array($alt)) {
-                        continue;
-                    }
-                    $name = trim((string) ($alt['vendor_name'] ?? ''));
-                    if (self::isDigiKeyOrMouser($name)) {
-                        continue;
-                    }
-                    $price = $this->toFloat($alt['unit_price'] ?? null);
-                    if ($name !== '' && $price !== null) {
-                        $vendors[] = [
-                            'vendor_name' => $name,
-                            'unit_price' => $price,
-                            'url' => isset($alt['url']) && trim((string) $alt['url']) !== '' ? trim((string) $alt['url']) : null,
-                        ];
-                    }
-                }
-                $altVendorResults[] = [
-                    'part_number' => $partNumber,
-                    'vendors' => $vendors,
-                ];
+        $anyError = null;
+
+        foreach ($mpns as $mpn) {
+            $data = $this->lookupVendorsForOneMpn($mpn, $inventoryId);
+            if (isset($data['error']) && $data['error'] !== null) {
+                $anyError = $data['error'];
+                continue;
+            }
+            $vendors = $data['vendors'] ?? [];
+            if ($vendors === []) {
+                continue;
+            }
+            $split = $this->fromVendorsListToPersistFormat($vendors, $vendorName, $quantity, $mpn);
+            foreach ($split['current_vendor_results'] as $row) {
+                $currentVendorResults[] = $row;
+            }
+            foreach ($split['alt_vendor_results'] as $row) {
+                $altVendorResults[] = $row;
             }
         }
 
-        $result = [
+        if ($currentVendorResults === [] && $altVendorResults === [] && $anyError !== null) {
+            $emptyResult['error'] = $anyError;
+            Log::warning('Gemini lookup failed (no results for any MPN)', [
+                'inventory_id' => $inventoryId,
+                'vendor_name' => $vendorName,
+                'mpns' => $mpns,
+                'error' => $anyError,
+            ]);
+            return $emptyResult;
+        }
+
+        return [
             'success' => true,
             'current_vendor_results' => $currentVendorResults,
-            'current_vendor_currency' => $currency,
+            'current_vendor_currency' => 'USD',
             'alt_vendor_results' => $altVendorResults,
             'error' => null,
-            'raw_text' => $text,
-            'prompt' => $prompt,
+            'raw_text' => null,
         ];
-        ResearchedMpn::setCached($cacheKey, ResearchedMpn::SOURCE_GEMINI, $result);
-        return $result;
     }
 
     protected function buildPrompt(string $vendorName, string $productLine, array $mpns, float $quantity): string
@@ -268,7 +159,272 @@ PROMPT;
     }
 
     /**
-     * Build prompt for a single MPN (alt vendors only).
+     * Build prompt for a single MPN: all vendors (current + alternative) with price tiers.
+     * Stored in researched_mpn with cache_key = MPN so any quantity/vendor can reuse.
+     */
+    protected function buildPromptVendorsOneMpn(string $mpn): string
+    {
+        $mpn = trim($mpn);
+        $mpnBlock = $mpn !== '' ? 'Manufacturing part number: '.$mpn : 'No part number provided.';
+
+        return <<<PROMPT
+You are a procurement research assistant. Answer with valid JSON only, no other text.
+
+For the single part number below, find all US-based distributors that stock it (e.g. Digi-Key, Mouser, Newark, Arrow, Avnet, Farnell). For each vendor return: vendor_name, product URL, and price at several quantity tiers. Use the exact decimal precision shown on each vendor's website (e.g. 3 or 4 decimal places).
+
+{$mpnBlock}
+
+Return a single JSON object with exactly this key:
+- "vendors" (array): one object per vendor. Each object has:
+  - "vendor_name" (string)
+  - "url" (string or null)
+  - "price_breaks" (array): list of { "quantity" (number), "unit_price" (number) } for different order quantities. Include tiers that the vendor shows (e.g. 1, 10, 100, 500, 1000, 5000, 10000). Use the exact unit_price decimals from the vendor site.
+
+Return only the JSON object.
+PROMPT;
+    }
+
+    /**
+     * Get unit price for a given quantity from Gemini-style price_breaks (quantity, unit_price).
+     * Uses the tier where break quantity <= requested quantity; if below all tiers, uses smallest tier price.
+     */
+    protected function priceForQuantityFromBreaks(array $priceBreaks, float $quantity): ?float
+    {
+        if ($priceBreaks === []) {
+            return null;
+        }
+        $q = (int) ceil($quantity);
+        $withQty = [];
+        foreach ($priceBreaks as $b) {
+            $bq = (int) ($b['quantity'] ?? 0);
+            $up = $b['unit_price'] ?? null;
+            if ($up !== null && $up !== '') {
+                $withQty[] = ['qty' => $bq, 'price' => (float) $up];
+            }
+        }
+        if ($withQty === []) {
+            return null;
+        }
+        usort($withQty, fn ($a, $b) => $b['qty'] <=> $a['qty']);
+        foreach ($withQty as $tier) {
+            if ($tier['qty'] <= $q) {
+                return (float) $tier['price'];
+            }
+        }
+        $minTier = $withQty[array_key_last($withQty)] ?? null;
+
+        return $minTier ? (float) $minTier['price'] : null;
+    }
+
+    /**
+     * Convert unified "vendors" list (with price_breaks) to persist format for one MPN.
+     * Picks unit_price from price_breaks for the given quantity; splits by currentVendorName into current vs alt.
+     *
+     * @return array{current_vendor_results: array, alt_vendor_results: array}
+     */
+    protected function fromVendorsListToPersistFormat(array $vendors, string $currentVendorName, float $quantity, string $mpn): array
+    {
+        $currentNorm = strtolower(trim($currentVendorName));
+        $currentNormNoSpaces = str_replace(' ', '', $currentNorm);
+        $currentVendorResults = [];
+        $altVendors = [];
+
+        foreach ($vendors as $v) {
+            if (! is_array($v)) {
+                continue;
+            }
+            $name = trim((string) ($v['vendor_name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $url = isset($v['url']) && trim((string) $v['url']) !== '' ? trim((string) $v['url']) : null;
+            $priceBreaks = $v['price_breaks'] ?? [];
+            $unitPrice = $this->priceForQuantityFromBreaks($priceBreaks, $quantity);
+            if ($unitPrice === null && ! empty($priceBreaks)) {
+                $first = reset($priceBreaks);
+                $unitPrice = isset($first['unit_price']) ? (float) $first['unit_price'] : null;
+            }
+            $entry = [
+                'vendor_name' => $name,
+                'unit_price' => $unitPrice,
+                'url' => $url,
+            ];
+            $nameNorm = strtolower($name);
+            $nameNormNoSpaces = str_replace(' ', '', $nameNorm);
+            $isCurrent = ($nameNorm === $currentNorm || $nameNormNoSpaces === $currentNormNoSpaces
+                || str_contains($nameNormNoSpaces, $currentNormNoSpaces) || str_contains($currentNormNoSpaces, $nameNormNoSpaces));
+            if ($isCurrent && $unitPrice !== null) {
+                $currentVendorResults[] = [
+                    'part_number' => $mpn,
+                    'unit_price' => $unitPrice,
+                    'url' => $url,
+                ];
+            } else {
+                if ($unitPrice !== null) {
+                    $altVendors[] = $entry;
+                }
+            }
+        }
+
+        $altVendorResults = [];
+        if ($altVendors !== []) {
+            $altVendorResults[] = ['part_number' => $mpn, 'vendors' => $altVendors];
+        }
+
+        return [
+            'current_vendor_results' => $currentVendorResults,
+            'alt_vendor_results' => $altVendorResults,
+        ];
+    }
+
+    /**
+     * Look up all vendors (current + alternative) for one MPN via Gemini. Cache by MPN only.
+     * Stored response_json is solely { "vendors": [...] } so any quantity/vendor can reuse.
+     *
+     * @return array{vendors: array, error: string|null}
+     */
+    public function lookupVendorsForOneMpn(string $mpn, ?int $inventoryId = null): array
+    {
+        $mpn = trim($mpn);
+        $empty = ['vendors' => [], 'error' => null];
+        if ($mpn === '') {
+            return $empty;
+        }
+
+        $cached = ResearchedMpn::getCached($mpn, ResearchedMpn::SOURCE_GEMINI);
+        if ($cached !== null && isset($cached['vendors']) && is_array($cached['vendors'])) {
+            $cachedVendors = $cached['vendors'];
+            if ($inventoryId !== null) {
+                Log::info('Gemini API: cache hit (researched_mpn)', [
+                    'mpn' => $mpn,
+                    'inventory_id' => $inventoryId,
+                    'vendors_count' => count($cachedVendors),
+                    'vendor_names' => array_column($cachedVendors, 'vendor_name'),
+                ]);
+            }
+            return ['vendors' => $cachedVendors, 'error' => null];
+        }
+
+        if (! $this->isEnabled()) {
+            $empty['error'] = 'Gemini disabled: missing GEMINI_API_KEY';
+            return $empty;
+        }
+
+        if ($inventoryId !== null) {
+            Log::info("item_id {$inventoryId}: Gemini AI (direct) calling API for MPN", ['mpn' => $mpn]);
+        }
+
+        $prompt = $this->buildPromptVendorsOneMpn($mpn);
+        $url = $this->buildUrl();
+        $payload = $this->buildGenerationPayload($prompt);
+
+        $maxAttempts = 3;
+        $attempt = 0;
+        $response = null;
+
+        while ($attempt < $maxAttempts) {
+            $attempt++;
+            $response = Http::timeout(60)->post($url, $payload);
+            if (! $response->failed()) {
+                break;
+            }
+            $json = $response->json();
+            $err = is_array($json) && isset($json['error']['message']) ? $json['error']['message'] : '';
+            $isQuota = $response->status() === 429 || (str_contains((string) $err, 'quota') && str_contains((string) $err, 'retry'));
+            if ($isQuota && $attempt < $maxAttempts && preg_match('/retry in (\d+(?:\.\d+)?)\s*s/i', $err, $m)) {
+                $wait = min(max((int) ceil((float) $m[1]), 5), 120);
+                Log::warning('Gemini API: quota/rate limit, retrying', [
+                    'mpn' => $mpn,
+                    'inventory_id' => $inventoryId,
+                    'attempt' => $attempt,
+                    'wait_seconds' => $wait,
+                    'error' => $err,
+                ]);
+                sleep($wait);
+                continue;
+            }
+            $empty['error'] = $err ?: 'Gemini API request failed (HTTP '.$response->status().')';
+            Log::warning('Gemini API call failed', [
+                'mpn' => $mpn,
+                'inventory_id' => $inventoryId,
+                'attempt' => $attempt,
+                'http_status' => $response->status(),
+                'error' => $empty['error'],
+            ]);
+            return $empty;
+        }
+
+        if ($response->failed()) {
+            $errMsg = is_array($response->json()) && isset($response->json()['error']['message'])
+                ? $response->json()['error']['message']
+                : 'Gemini API request failed (HTTP '.$response->status().')';
+            $empty['error'] = $errMsg;
+            Log::warning('Gemini API call failed (after retries)', [
+                'mpn' => $mpn,
+                'inventory_id' => $inventoryId,
+                'http_status' => $response->status(),
+                'error' => $errMsg,
+            ]);
+            return $empty;
+        }
+
+        $body = $response->json();
+        $text = $this->extractText($body);
+        if ($text === null || $text === '') {
+            $empty['error'] = 'Gemini response did not include any text content';
+            Log::warning('Gemini API: response had no text content', [
+                'mpn' => $mpn,
+                'inventory_id' => $inventoryId,
+                'error' => $empty['error'],
+            ]);
+            return $empty;
+        }
+
+        $parsed = $this->parseJsonResponse($text);
+        if (! is_array($parsed) || ! isset($parsed['vendors']) || ! is_array($parsed['vendors'])) {
+            $parseError = 'Gemini response was not valid JSON or missing "vendors"';
+            Log::warning('Gemini API: invalid or missing vendors in response', [
+                'mpn' => $mpn,
+                'inventory_id' => $inventoryId,
+                'error' => $parseError,
+                'raw_text_preview' => is_string($text) ? mb_substr($text, 0, 300) : '(non-string)',
+            ]);
+            return ['vendors' => [], 'error' => $parseError, 'raw_text' => $text];
+        }
+
+        $vendors = [];
+        foreach ($parsed['vendors'] as $v) {
+            if (! is_array($v)) {
+                continue;
+            }
+            $name = trim((string) ($v['vendor_name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $priceBreaks = $v['price_breaks'] ?? [];
+            if (! is_array($priceBreaks)) {
+                $priceBreaks = [];
+            }
+            $vendors[] = [
+                'vendor_name' => $name,
+                'url' => isset($v['url']) && trim((string) $v['url']) !== '' ? trim((string) $v['url']) : null,
+                'price_breaks' => $priceBreaks,
+            ];
+        }
+
+        $toStore = ['vendors' => $vendors];
+        ResearchedMpn::setCached($mpn, ResearchedMpn::SOURCE_GEMINI, $toStore, null);
+        Log::info('Gemini API call succeeded', [
+            'mpn' => $mpn,
+            'inventory_id' => $inventoryId,
+            'vendors_count' => count($vendors),
+            'vendor_names' => array_column($vendors, 'vendor_name'),
+        ]);
+        return ['vendors' => $vendors, 'error' => null];
+    }
+
+    /**
+     * Build prompt for a single MPN (alt vendors only). Kept for reference; primary flow uses buildPromptVendorsOneMpn.
      */
     protected function buildPromptForAltVendorsOneMpn(string $currentVendorName, string $productLine, string $mpn, float $quantity): string
     {
@@ -294,139 +450,43 @@ PROMPT;
     }
 
     /**
-     * Look up alternative vendors for a single MPN via Gemini. Uses cache_key = MPN in researched_mpn.
-     *
-     * @return array{success: bool, alt_vendor_results: array, error: string|null, raw_text: string|null, prompt: string|null}
+     * Build alt_vendor_results from unified vendors list for one MPN: exclude DigiKey/Mouser, pick price at quantity from price_breaks.
      */
-    protected function lookupAltVendorsForOneMpn(string $currentVendorName, string $productLine, string $mpn, float $quantity, ?int $inventoryId = null): array
+    protected function vendorsListToAltVendorResults(array $vendors, float $quantity, string $mpn): array
     {
-        $emptyResult = [
-            'success' => false,
-            'alt_vendor_results' => [],
-            'error' => null,
-            'raw_text' => null,
-            'prompt' => null,
-        ];
-
-        $mpn = trim($mpn);
-        if ($mpn === '') {
-            $emptyResult['success'] = true;
-            return $emptyResult;
-        }
-
-        $cached = ResearchedMpn::getCached($mpn, ResearchedMpn::SOURCE_GEMINI);
-        if ($cached !== null && ! empty($cached['success']) && ! empty($cached['alt_vendor_results'])) {
-            if ($inventoryId !== null) {
-                Log::info("item_id {$inventoryId}: Gemini AI (alt) (researched_mpn)");
-            }
-            return $cached;
-        }
-
-        if ($inventoryId !== null) {
-            Log::info("item_id {$inventoryId}: Gemini AI (alt) (direct)");
-        }
-
-        $prompt = $this->buildPromptForAltVendorsOneMpn($currentVendorName, $productLine, $mpn, $quantity);
-        $url = $this->buildUrl();
-        $payload = $this->buildGenerationPayload($prompt);
-
-        $maxAttempts = 3;
-        $attempt = 0;
-        $response = null;
-
-        while ($attempt < $maxAttempts) {
-            $attempt++;
-            $response = Http::timeout(60)->post($url, $payload);
-            if (! $response->failed()) {
-                break;
-            }
-            $json = $response->json();
-            $err = is_array($json) && isset($json['error']['message']) ? $json['error']['message'] : '';
-            $isQuota = $response->status() === 429 || (str_contains((string) $err, 'quota') && str_contains((string) $err, 'retry'));
-            if ($isQuota && $attempt < $maxAttempts && preg_match('/retry in (\d+(?:\.\d+)?)\s*s/i', $err, $m)) {
-                $wait = min(max((int) ceil((float) $m[1]), 5), 120);
-                sleep($wait);
+        $altVendors = [];
+        foreach ($vendors as $v) {
+            if (! is_array($v)) {
                 continue;
             }
-            $emptyResult['error'] = $err ?: 'Gemini API request failed (HTTP '.$response->status().')';
-            return $emptyResult;
-        }
-
-        if ($response->failed()) {
-            $emptyResult['error'] = is_array($response->json()) && isset($response->json()['error']['message'])
-                ? $response->json()['error']['message']
-                : 'Gemini API request failed (HTTP '.$response->status().')';
-            return $emptyResult;
-        }
-
-        $body = $response->json();
-        $text = $this->extractText($body);
-        if ($text === null || $text === '') {
-            $emptyResult['error'] = 'Gemini response did not include any text content';
-            return $emptyResult;
-        }
-
-        $parsed = $this->parseJsonResponse($text);
-        if (! is_array($parsed)) {
-            $emptyResult['error'] = 'Gemini response was not valid JSON';
-            $emptyResult['raw_text'] = $text;
-            return $emptyResult;
-        }
-
-        $altVendorResults = [];
-        $rawAltResults = $parsed['alt_vendor_results'] ?? [];
-        if (is_array($rawAltResults)) {
-            foreach ($rawAltResults as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-                $partNumber = trim((string) ($row['part_number'] ?? ''));
-                if ($partNumber === '') {
-                    $partNumber = $mpn;
-                }
-                $vendors = [];
-                foreach ($row['vendors'] ?? [] as $alt) {
-                    if (! is_array($alt)) {
-                        continue;
-                    }
-                    $name = trim((string) ($alt['vendor_name'] ?? ''));
-                    if (self::isDigiKeyOrMouser($name)) {
-                        continue;
-                    }
-                    $price = $this->toFloat($alt['unit_price'] ?? null);
-                    if ($name !== '' && $price !== null) {
-                        $vendors[] = [
-                            'vendor_name' => $name,
-                            'unit_price' => $price,
-                            'url' => isset($alt['url']) && trim((string) $alt['url']) !== '' ? trim((string) $alt['url']) : null,
-                        ];
-                    }
-                }
-                $altVendorResults[] = [
-                    'part_number' => $partNumber,
-                    'vendors' => $vendors,
-                ];
+            $name = trim((string) ($v['vendor_name'] ?? ''));
+            if ($name === '' || self::isDigiKeyOrMouser($name)) {
+                continue;
             }
+            $priceBreaks = $v['price_breaks'] ?? [];
+            $unitPrice = $this->priceForQuantityFromBreaks($priceBreaks, $quantity);
+            if ($unitPrice === null && ! empty($priceBreaks)) {
+                $first = reset($priceBreaks);
+                $unitPrice = isset($first['unit_price']) ? (float) $first['unit_price'] : null;
+            }
+            if ($unitPrice === null) {
+                continue;
+            }
+            $altVendors[] = [
+                'vendor_name' => $name,
+                'unit_price' => $unitPrice,
+                'url' => isset($v['url']) && trim((string) $v['url']) !== '' ? trim((string) $v['url']) : null,
+            ];
         }
-
-        if ($altVendorResults === []) {
-            $altVendorResults[] = ['part_number' => $mpn, 'vendors' => []];
+        if ($altVendors === []) {
+            return [];
         }
-
-        $result = [
-            'success' => true,
-            'alt_vendor_results' => $altVendorResults,
-            'error' => null,
-            'raw_text' => $text,
-            'prompt' => $prompt,
-        ];
-        ResearchedMpn::setCached($mpn, ResearchedMpn::SOURCE_GEMINI, $result);
-        return $result;
+        return [['part_number' => $mpn, 'vendors' => $altVendors]];
     }
 
     /**
      * Look up alternative vendors only via Gemini (no current vendor lookup).
-     * Calls Gemini once per MPN; cache_key in researched_mpn is the MPN so research can look up by cache_key/MPN.
+     * Uses same per-MPN cache as full lookup (lookupVendorsForOneMpn); excludes DigiKey/Mouser from results; price from price_breaks at quantity.
      *
      * @param  array<int, string>  $mpns
      * @return array{success: bool, alt_vendor_results: array, error: string|null, raw_text: string|null, prompt: string|null}
@@ -441,11 +501,7 @@ PROMPT;
             'prompt' => null,
         ];
 
-        if (! $this->isEnabled()) {
-            $emptyResult['error'] = 'Gemini disabled: missing GEMINI_API_KEY';
-            return $emptyResult;
-        }
-
+        $mpns = array_filter(array_map('trim', $mpns));
         if ($mpns === []) {
             $emptyResult['success'] = true;
             return $emptyResult;
@@ -458,14 +514,14 @@ PROMPT;
             if ($partNumber === '') {
                 continue;
             }
-            $one = $this->lookupAltVendorsForOneMpn($currentVendorName, $productLine, $partNumber, $quantity, $inventoryId);
-            if (! empty($one['alt_vendor_results'])) {
-                foreach ($one['alt_vendor_results'] as $row) {
-                    $mergedAltVendorResults[] = $row;
-                }
+            $data = $this->lookupVendorsForOneMpn($partNumber, $inventoryId);
+            if (isset($data['error']) && $data['error'] !== null) {
+                $anyError = $data['error'];
+                continue;
             }
-            if (! empty($one['error'])) {
-                $anyError = $one['error'];
+            $vendors = $data['vendors'] ?? [];
+            foreach ($this->vendorsListToAltVendorResults($vendors, $quantity, $partNumber) as $row) {
+                $mergedAltVendorResults[] = $row;
             }
         }
 

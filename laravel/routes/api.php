@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -7,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 // These endpoints are consumed by the React SPA using the same session cookie as the web app.
 // Laravel's default API middleware group is stateless; add 'web' so session auth works.
 Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/procurement/inventories', [InventoryController::class, 'index']);
+    Route::post('/procurement/inventories/{inventory}/clear-research', [InventoryController::class, 'clearResearch'])->middleware('can:manage-procurement');
     Route::get('/procurement/summary', [ProcurementController::class, 'summary']);
     Route::get('/procurement/analytics', [ProcurementController::class, 'analytics']);
     Route::get('/procurement/queue', [ProcurementController::class, 'queue']);

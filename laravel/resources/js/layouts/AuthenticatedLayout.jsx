@@ -86,6 +86,17 @@ export default function AuthenticatedLayout() {
             </NavIcon>
             Run Controls
           </NavLink>
+          <NavLink to="/dashboard/inventories" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
+            <NavIcon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
+                <path d="M4 7v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7" />
+                <path d="M12 12v4" />
+                <path d="M12 8h.01" />
+              </svg>
+            </NavIcon>
+            Inventories
+          </NavLink>
           {canManageUsers && (
             <NavLink to="/dashboard/users" className={({ isActive }) => `app-nav-link ${isActive ? 'active' : ''}`} end>
               <NavIcon>

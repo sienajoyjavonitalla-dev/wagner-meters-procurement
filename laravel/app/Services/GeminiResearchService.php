@@ -112,7 +112,7 @@ class GeminiResearchService
         return <<<PROMPT
 You are a procurement research assistant. Answer with valid JSON only, no other text.
 
-For each manufacturing part number (MPN) listed below, search for the unit price and product page URL from the current vendor ({$vendorName}). Then search for US-based alternative vendors that stock any of these parts and return their best price and link per vendor.
+For each manufacturing part number (MPN) listed below, search for the unit price and product page URL from the current vendor ({$vendorName}). Then search for alternative vendors that stock any of these parts and return their best price and link per vendor. Only include vendors that are based in the United States and serve US customers directly. Do NOT include vendors primarily based outside the US (e.g. Farnell, RS Components, TME, element14 outside the US). Prefer US distributors such as Newark, Arrow, Avnet US. Do NOT include Digi-Key or Mouser in the alternative list (those are filled from API separately). If unsure whether a vendor is US-based, do not include it.
 
 Context:
 - Current vendor: {$vendorName}
@@ -123,7 +123,7 @@ Context:
 Return a single JSON object with exactly these keys:
 - "current_vendor_results" (array): one object per MPN, each with "part_number" (string, the MPN), "unit_price" (number or null), "url" (string or null). Search {$vendorName} for each part number and set price and product URL. Use the exact part_number strings listed above.
 - "current_vendor_currency" (string): e.g. "USD"
-- "alt_vendor_results" (array): one object per MPN, each with "part_number" (string, the MPN), "vendors" (array of objects). Each vendor object has "vendor_name" (string), "unit_price" (number), "url" (string or null). For each part number, list US-based alternative vendors that stock that part (e.g. Newark, Arrow, Avnet, Farnell). Do NOT include Digi-Key or Mouser in alt_vendor_results (those are filled from API separately). Use the exact part_number strings listed above. Sort each part's vendors by lowest unit_price first.
+- "alt_vendor_results" (array): one object per MPN, each with "part_number" (string, the MPN), "vendors" (array of objects). Each vendor object has "vendor_name" (string), "unit_price" (number), "url" (string or null). For each part number, list alternative vendors that stock that part. Only include vendors based in the United States (e.g. Newark, Arrow, Avnet US). Do NOT include Digi-Key or Mouser in alt_vendor_results (those are filled from API separately). Do NOT include non-US vendors (e.g. Farnell, RS Components, TME). Use the exact part_number strings listed above. Sort each part's vendors by lowest unit_price first.
 
 Return only the JSON object.
 PROMPT;
@@ -143,7 +143,7 @@ PROMPT;
         return <<<PROMPT
 You are a procurement research assistant. Answer with valid JSON only, no other text.
 
-The current vendor ({$currentVendorName}) pricing is already known. For each manufacturing part number (MPN) below, search for US-based ALTERNATIVE vendors only (e.g. Newark, Arrow, Avnet, Farnell). Do NOT include {$currentVendorName} in the results. Do NOT include Digi-Key or Mouser in the results (those are filled from API separately). Return each part's alternative vendors with unit price and product URL, sorted by lowest unit_price first.
+The current vendor ({$currentVendorName}) pricing is already known. For each manufacturing part number (MPN) below, search for ALTERNATIVE vendors only. Only include vendors that are based in the United States and serve US customers directly (e.g. Newark, Arrow, Avnet US). Do NOT include {$currentVendorName} in the results. Do NOT include Digi-Key or Mouser in the results (those are filled from API separately). Do NOT include vendors primarily based outside the US (e.g. Farnell, RS Components, TME). If unsure whether a vendor is US-based, do not include it. Return each part's alternative vendors with unit price and product URL, sorted by lowest unit_price first.
 
 Context:
 - Current vendor (exclude from results): {$currentVendorName}
@@ -170,7 +170,7 @@ PROMPT;
         return <<<PROMPT
 You are a procurement research assistant. Answer with valid JSON only, no other text.
 
-For the single part number below, find all US-based distributors that stock it (e.g. Digi-Key, Mouser, Newark, Arrow, Avnet, Farnell). For each vendor return: vendor_name, product URL, and price at several quantity tiers. Use the exact decimal precision shown on each vendor's website (e.g. 3 or 4 decimal places).
+For the single part number below, find all distributors that stock it and are based in the United States (e.g. Digi-Key, Mouser, Newark, Arrow, Avnet US). Only include vendors that are US-based and serve US customers directly. Do NOT include vendors primarily based outside the US (e.g. Farnell, RS Components, TME). For each vendor return: vendor_name, product URL, and price at several quantity tiers. Use the exact decimal precision shown on each vendor's website (e.g. 3 or 4 decimal places).
 
 {$mpnBlock}
 
@@ -434,7 +434,7 @@ PROMPT;
         return <<<PROMPT
 You are a procurement research assistant. Answer with valid JSON only, no other text.
 
-The current vendor ({$currentVendorName}) pricing is already known. For the manufacturing part number below, search for US-based ALTERNATIVE vendors only (e.g. Newark, Arrow, Avnet, Farnell). Do NOT include {$currentVendorName} in the results. Do NOT include Digi-Key or Mouser in the results (those are filled from API separately). Return alternative vendors with unit price and product URL, sorted by lowest unit_price first.
+The current vendor ({$currentVendorName}) pricing is already known. For the manufacturing part number below, search for ALTERNATIVE vendors only. Only include vendors that are based in the United States and serve US customers directly (e.g. Newark, Arrow, Avnet US). Do NOT include {$currentVendorName} in the results. Do NOT include Digi-Key or Mouser in the results (those are filled from API separately). Do NOT include vendors primarily based outside the US (e.g. Farnell, RS Components, TME). If unsure whether a vendor is US-based, do not include it. Return alternative vendors with unit price and product URL, sorted by lowest unit_price first.
 
 Context:
 - Current vendor (exclude from results): {$currentVendorName}
@@ -443,7 +443,7 @@ Context:
 - {$mpnBlock}
 
 Return a single JSON object with exactly this key:
-- "alt_vendor_results" (array): one object with "part_number" (string, the exact MPN "{$mpn}"), "vendors" (array of objects). Each vendor object has "vendor_name" (string), "unit_price" (number), "url" (string or null). List only vendors that are NOT {$currentVendorName}. Do NOT include Digi-Key or Mouser. Sort vendors by lowest unit_price first.
+- "alt_vendor_results" (array): one object with "part_number" (string, the exact MPN "{$mpn}"), "vendors" (array of objects). Each vendor object has "vendor_name" (string), "unit_price" (number), "url" (string or null). List only US-based vendors that are NOT {$currentVendorName}. Do NOT include Digi-Key or Mouser. Do NOT include non-US vendors (e.g. Farnell, RS Components, TME). Sort vendors by lowest unit_price first.
 
 Return only the JSON object.
 PROMPT;

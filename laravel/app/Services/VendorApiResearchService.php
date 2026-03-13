@@ -16,6 +16,7 @@ class VendorApiResearchService
     public function __construct(
         protected DigiKeyClient $digiKey,
         protected MouserClient $mouser,
+        protected Element14Client $element14,
     ) {
     }
 
@@ -46,8 +47,23 @@ class VendorApiResearchService
         if (str_contains($normalized, 'mouser')) {
             return $this->lookupMouser($mpns, $quantity, $inventory->id);
         }
+        if ($this->isElement14Vendor($normalized)) {
+            return $this->lookupElement14($mpns, $quantity, $inventory->id);
+        }
 
         return null;
+    }
+
+    /**
+     * Detect whether vendor name refers to element14/Newark/Farnell.
+     */
+    protected function isElement14Vendor(string $normalizedVendorName): bool
+    {
+        $n = $normalizedVendorName;
+        $nNoSpaces = str_replace(' ', '', $n);
+        return str_contains($nNoSpaces, 'element14')
+            || str_contains($n, 'farnell')
+            || str_contains($n, 'newark');
     }
 
     /**
@@ -183,6 +199,60 @@ class VendorApiResearchService
     }
 
     /**
+     * @param  array<int, string>  $mpns
+     * @return array{success: true, current_vendor_results: array, current_vendor_currency: string, alt_vendor_results: array, source: string}|null
+     */
+    protected function lookupElement14(array $mpns, float $quantity, int $inventoryId): ?array
+    {
+        if (! $this->element14->isEnabled()) {
+            return null;
+        }
+
+        $currentVendorResults = [];
+        $currency = 'USD';
+
+        foreach ($mpns as $partNumber) {
+            $partNumber = trim((string) $partNumber);
+            if ($partNumber === '') {
+                continue;
+            }
+            $findings = $this->element14->lookup($partNumber, $inventoryId);
+            $finding = $this->bestMatchingFinding($findings, $partNumber);
+
+            if ($finding === null) {
+                continue;
+            }
+            $unitPrice = self::priceForQuantity($finding->priceBreaks, $quantity);
+            if ($unitPrice === null) {
+                $unitPrice = $finding->minUnitPrice;
+            }
+            if ($unitPrice !== null) {
+                $currentVendorResults[] = [
+                    'part_number' => $partNumber,
+                    'unit_price' => $unitPrice,
+                    'url' => $finding->productUrl,
+                ];
+                if ($finding->currency !== null) {
+                    $currency = $finding->currency;
+                }
+            }
+        }
+
+        if ($currentVendorResults === []) {
+            return null;
+        }
+
+        $result = [
+            'success' => true,
+            'current_vendor_results' => $currentVendorResults,
+            'current_vendor_currency' => $currency,
+            'alt_vendor_results' => $this->fetchAltVendorsFromApis($mpns, $quantity, 'element14', $inventoryId),
+            'source' => 'element14_api',
+        ];
+        return $result;
+    }
+
+    /**
      * Fetch alternative vendor pricing from DigiKey and/or Mouser API.
      * Skips the API for the current vendor. Caller always adds Gemini alt-vendor results separately.
      * - Current = DigiKey → this returns Mouser only (Gemini adds others).
@@ -197,8 +267,10 @@ class VendorApiResearchService
     {
         $normalized = strtolower(trim($currentVendorName));
         $normalizedNoSpaces = str_replace(' ', '', $normalized);
+        $isElement14 = $this->isElement14Vendor($normalized);
         $callDigiKey = ! str_contains($normalizedNoSpaces, 'digikey') && ! str_contains($normalized, 'digi-key') && ! str_contains($normalized, 'digi key');
         $callMouser = ! str_contains($normalized, 'mouser');
+        $callElement14 = ! $isElement14;
 
         $byPart = [];
         foreach ($mpns as $partNumber) {
@@ -231,6 +303,21 @@ class VendorApiResearchService
                     if ($unitPrice !== null) {
                         $vendors[] = [
                             'vendor_name' => 'Mouser',
+                            'unit_price' => $unitPrice,
+                            'url' => $finding->productUrl,
+                        ];
+                    }
+                }
+            }
+
+            if ($callElement14 && $this->element14->isEnabled()) {
+                $findings = $this->element14->lookup($partNumber, $inventoryId);
+                $finding = $this->bestMatchingFinding($findings, $partNumber);
+                if ($finding !== null) {
+                    $unitPrice = self::priceForQuantity($finding->priceBreaks, $quantity) ?? $finding->minUnitPrice;
+                    if ($unitPrice !== null) {
+                        $vendors[] = [
+                            'vendor_name' => 'Newark',
                             'unit_price' => $unitPrice,
                             'url' => $finding->productUrl,
                         ];

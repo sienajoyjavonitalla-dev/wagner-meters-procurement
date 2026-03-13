@@ -23,6 +23,23 @@ return [
         ),
     ],
 
+    'element14' => [
+        // Product Search API (REST) base URL, e.g. https://partner.element14.com
+        'base_url' => env('ELEMENT14_BASE_URL', 'https://partner.element14.com'),
+        // API version number used in the catalog/products endpoint, e.g. 1.4
+        'version' => env('ELEMENT14_VERSION', '1.4'),
+        // Store identifier, defaulting to Newark US.
+        'store_id' => env('ELEMENT14_STORE_ID', 'www.newark.com'),
+        // Your API key from the element14/Newark portal.
+        'api_key' => env('ELEMENT14_API_KEY'),
+        // Optional: how many results to request per MPN lookup.
+        'number_of_results' => (int) env('ELEMENT14_NUMBER_OF_RESULTS', 1),
+        // Optional: refinements/filters string, e.g. rohsCompliant,inStock
+        'refinements_filters' => env('ELEMENT14_REFINEMENTS_FILTERS', 'rohsCompliant,inStock'),
+        // Optional: response group, e.g. small, medium, large (large includes prices)
+        'response_group' => env('ELEMENT14_RESPONSE_GROUP', 'large'),
+    ],
+
     'nexar' => [
         'client_id' => env('NEXAR_CLIENT_ID'),
         'client_secret' => env('NEXAR_CLIENT_SECRET'),

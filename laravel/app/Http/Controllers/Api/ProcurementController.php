@@ -12,6 +12,7 @@ use App\Models\ResearchRun;
 use App\Services\AppSettingsService;
 use App\Services\AuditLogService;
 use App\Services\GeminiResearchService;
+use App\Services\ProcurementReportingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,142 +27,17 @@ class ProcurementController extends Controller
     /**
      * 3.1.1 GET KPIs/summary (inventory-based)
      */
-    public function summary(): JsonResponse
+    public function summary(ProcurementReportingService $reporting): JsonResponse
     {
-        $importId = $this->currentImportId();
-        if ($importId === null) {
-            return response()->json([
-                'queue_status_counts' => ['researched' => 0, 'pending' => 0],
-                'provider_hit_counts' => [],
-                'savings_potential_per_vendor' => [],
-            ]);
-        }
-
-        $inventories = Inventory::query()
-            ->where('data_import_id', $importId)
-            ->with(['mpns', 'altVendors'])
-            ->get();
-
-        $researched = $inventories->whereNotNull('research_completed_at')->count();
-        $pending = $inventories->whereNull('research_completed_at')->count();
-        $queueStatusCounts = [
-            'researched' => $researched,
-            'pending' => $pending,
-        ];
-
-        $geminiTotal = (int) ResearchRun::query()->sum('gemini_hits');
-        $providerHitCounts = $geminiTotal > 0 ? ['gemini' => $geminiTotal] : [];
-
-        $savingsByVendor = [];
-        foreach ($inventories as $inv) {
-            $current = (float) ($inv->unit_cost ?? 0);
-            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
-            $lowestAlt = $inv->altVendors->min('unit_price');
-            $lowest = null;
-            if ($lowestMpn !== null && $lowestAlt !== null) {
-                $lowest = min((float) $lowestMpn, (float) $lowestAlt);
-            } elseif ($lowestMpn !== null) {
-                $lowest = (float) $lowestMpn;
-            } elseif ($lowestAlt !== null) {
-                $lowest = (float) $lowestAlt;
-            }
-            if ($lowest !== null && $current > $lowest) {
-                $vendor = (string) ($inv->vendor_name ?? 'Unknown');
-                $savingsByVendor[$vendor] = ($savingsByVendor[$vendor] ?? 0) + ($current - $lowest);
-            }
-        }
-        arsort($savingsByVendor);
-        $savingsPotentialPerVendor = [];
-        foreach (array_slice($savingsByVendor, 0, 10, true) as $vendorName => $total) {
-            $savingsPotentialPerVendor[] = [
-                'vendor_name' => $vendorName,
-                'savings_total' => round((float) $total, 4),
-            ];
-        }
-
-        return response()->json([
-            'queue_status_counts' => $queueStatusCounts,
-            'provider_hit_counts' => $providerHitCounts,
-            'savings_potential_per_vendor' => $savingsPotentialPerVendor,
-        ]);
+        return response()->json($reporting->buildSummary());
     }
 
     /**
      * 6.1.4 GET analytics: savings potential by vendor, optional daily trend.
      */
-    public function analytics(): JsonResponse
+    public function analytics(ProcurementReportingService $reporting): JsonResponse
     {
-        $importId = $this->currentImportId();
-        if ($importId === null) {
-            return response()->json([
-                'top_suppliers_by_savings' => [],
-                'daily_modeled_savings' => [],
-            ]);
-        }
-
-        $inventories = Inventory::query()
-            ->where('data_import_id', $importId)
-            ->whereNotNull('research_completed_at')
-            ->with(['mpns', 'altVendors'])
-            ->get();
-
-        $savingsByVendor = [];
-        foreach ($inventories as $inv) {
-            $current = (float) ($inv->unit_cost ?? 0);
-            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
-            $lowestAlt = $inv->altVendors->min('unit_price');
-            $lowest = null;
-            if ($lowestMpn !== null && $lowestAlt !== null) {
-                $lowest = min((float) $lowestMpn, (float) $lowestAlt);
-            } elseif ($lowestMpn !== null) {
-                $lowest = (float) $lowestMpn;
-            } elseif ($lowestAlt !== null) {
-                $lowest = (float) $lowestAlt;
-            }
-            if ($lowest !== null && $current > $lowest) {
-                $vendor = (string) ($inv->vendor_name ?? 'Unknown');
-                $savingsByVendor[$vendor] = ($savingsByVendor[$vendor] ?? 0) + ($current - $lowest);
-            }
-        }
-        arsort($savingsByVendor);
-        $topSuppliers = [];
-        foreach (array_slice($savingsByVendor, 0, 10, true) as $vendorName => $total) {
-            $topSuppliers[] = [
-                'supplier_name' => $vendorName,
-                'savings_total' => round((float) $total, 4),
-            ];
-        }
-
-        $byDay = [];
-        foreach ($inventories as $inv) {
-            $day = $inv->research_completed_at?->format('Y-m-d');
-            if ($day === null) {
-                continue;
-            }
-            $current = (float) ($inv->unit_cost ?? 0);
-            $lowestMpn = $inv->mpns->whereNotNull('unit_price')->min('unit_price');
-            $lowestAlt = $inv->altVendors->min('unit_price');
-            $lowest = null;
-            if ($lowestMpn !== null && $lowestAlt !== null) {
-                $lowest = min((float) $lowestMpn, (float) $lowestAlt);
-            } elseif ($lowestMpn !== null) {
-                $lowest = (float) $lowestMpn;
-            } elseif ($lowestAlt !== null) {
-                $lowest = (float) $lowestAlt;
-            }
-            $savings = ($lowest !== null && $current > $lowest) ? ($current - $lowest) : 0;
-            $byDay[$day] = ($byDay[$day] ?? 0) + $savings;
-        }
-        ksort($byDay);
-        $dailySavings = [];
-        foreach ($byDay as $day => $total) {
-            $dailySavings[] = ['day' => $day, 'savings_total' => round((float) $total, 4)];
-        }
-
-        return response()->json([
-            'top_suppliers_by_savings' => $topSuppliers,
-            'daily_modeled_savings' => $dailySavings,
-        ]);
+        return response()->json($reporting->buildAnalytics());
     }
 
     /**
@@ -199,7 +75,7 @@ class ProcurementController extends Controller
             $lowestMpnVal = $mpnsWithPrice->isEmpty() ? null : (float) $mpnsWithPrice->min('unit_price');
             $currentVendorName = (string) ($inv->vendor_name ?? '');
             $lowestMpnRow = $inv->mpns->whereNotNull('unit_price')->sortBy('unit_price')->first();
-            $rawUrl = $lowestMpnRow?->url;
+            $rawUrl = $lowestMpnRow ? $lowestMpnRow->url : null;
             $currentVendorUrl = ($rawUrl !== null && trim((string) $rawUrl) !== '') ? trim((string) $rawUrl) : null;
 
             $lowestAlt = $inv->altVendors->sortBy('unit_price')->first();
@@ -294,7 +170,7 @@ class ProcurementController extends Controller
         $gemini = app(GeminiResearchService::class);
 
         return response()->json([
-            'last_research_run_at' => $lastRun?->completed_at?->format('c'),
+            'last_research_run_at' => $lastRun && $lastRun->completed_at ? $lastRun->completed_at->format('c') : null,
             'fx_snapshot' => null,
             'providers_enabled' => [
                 'gemini' => $gemini->isEnabled(),
@@ -327,7 +203,7 @@ class ProcurementController extends Controller
 
         dispatch(new RunResearchJob($batchSize, $run->id));
 
-        $auditLog->log('research.run.queued', $request->user()?->id, 'research_run', $run->id, [
+        $auditLog->log('research.run.queued', $request->user() ? $request->user()->id : null, 'research_run', $run->id, [
             'batch_size' => $batchSize,
         ]);
 
@@ -382,7 +258,7 @@ class ProcurementController extends Controller
         ])->all();
 
         $updated = $settings->updateResearchSettings($payload);
-        $auditLog->log('settings.updated', $request->user()?->id, 'system_setting', AppSettingsService::RESEARCH_KEY, [
+        $auditLog->log('settings.updated', $request->user() ? $request->user()->id : null, 'system_setting', AppSettingsService::RESEARCH_KEY, [
             'updated' => $updated,
         ]);
 
@@ -416,7 +292,7 @@ class ProcurementController extends Controller
             'run_id' => $run->id,
             'status' => $run->status,
             'message' => $run->message,
-            'completed_at' => $run->completed_at?->toIso8601String(),
+            'completed_at' => $run->completed_at ? $run->completed_at->toIso8601String() : null,
             'created_at' => $run->created_at->toIso8601String(),
         ]);
     }

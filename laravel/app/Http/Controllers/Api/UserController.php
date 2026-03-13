@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\UserManagementException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
+use App\Http\Requests\UpdateUserRoleRequest;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\UserManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -31,18 +33,12 @@ class UserController extends Controller
      * 6.1.3 POST create user.
      */
     public function store(
-        Request $request,
+        StoreUserRequest $request,
         AuditLogService $auditLog,
         UserManagementService $userManagement
     ): JsonResponse {
         $actor = $request->user();
-        $validated = $request->validate([
-            'first_name' => ['nullable', 'string', 'max:255'],
-            'last_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_VIEWER])],
-        ]);
+        $validated = $request->validated();
 
         try {
             $user = $userManagement->createUser($validated, $actor, $auditLog);
@@ -62,19 +58,13 @@ class UserController extends Controller
      * 6.1.3 PATCH update user.
      */
     public function update(
-        Request $request,
+        UpdateUserRequest $request,
         User $user,
         AuditLogService $auditLog,
         UserManagementService $userManagement
     ): JsonResponse {
         $actor = $request->user();
-        $validated = $request->validate([
-            'first_name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'last_name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
-            'role' => ['sometimes', Rule::in([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_VIEWER])],
-        ]);
+        $validated = $request->validated();
 
         try {
             $userManagement->updateUser($user, $validated, $actor, $auditLog);
@@ -110,15 +100,13 @@ class UserController extends Controller
      * 6.1.3 PATCH user role.
      */
     public function updateRole(
-        Request $request,
+        UpdateUserRoleRequest $request,
         User $user,
         AuditLogService $auditLog,
         UserManagementService $userManagement
     ): JsonResponse {
         $actor = $request->user();
-        $validated = $request->validate([
-            'role' => ['required', Rule::in([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_VIEWER])],
-        ]);
+        $validated = $request->validated();
 
         try {
             $userManagement->updateUserRole($user, $validated['role'], $actor, $auditLog);

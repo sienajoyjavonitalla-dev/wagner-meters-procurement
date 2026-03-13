@@ -27,11 +27,21 @@ export default function Inventories() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE);
   const [clearingId, setClearingId] = useState(null);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [itemFilter, setItemFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const fetchInventories = useCallback(() => {
     setLoading(true);
     setError(null);
-    apiGet(`${API}?page=${page}&per_page=${perPage}`)
+    const params = new URLSearchParams();
+    params.set('page', page);
+    params.set('per_page', perPage);
+    if (vendorFilter.trim()) params.set('vendor', vendorFilter.trim());
+    if (itemFilter.trim()) params.set('item_id', itemFilter.trim());
+    if (statusFilter) params.set('status', statusFilter);
+    apiGet(`${API}?${params.toString()}`)
       .then((res) => {
         setData(res.data ?? []);
         setMeta(res.meta ?? { current_page: 1, last_page: 1, per_page: perPage, total: 0 });
@@ -42,14 +52,14 @@ export default function Inventories() {
       .finally(() => {
         setLoading(false);
       });
-  }, [page, perPage]);
+  }, [page, perPage, vendorFilter, itemFilter, statusFilter]);
 
   useEffect(() => {
     fetchInventories();
   }, [fetchInventories]);
 
   const handleClearResearch = (inv) => {
-    if (clearingId != null) return;
+    if (clearingId != null || clearingAll) return;
     setClearingId(inv.id);
     apiPost(`${API}/${inv.id}/clear-research`, {})
       .then(() => {
@@ -98,6 +108,101 @@ export default function Inventories() {
         <p style={{ color: '#8b949e' }}>No inventory items. Import an inventory file from Data Import first.</p>
       ) : (
         <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <input
+              type="text"
+              placeholder="Filter by vendor"
+              value={vendorFilter}
+              onChange={(e) => {
+                setPage(1);
+                setVendorFilter(e.target.value);
+              }}
+              style={{
+                padding: '0.35rem 0.5rem',
+                background: '#161b22',
+                border: '1px solid #30363d',
+                borderRadius: 6,
+                color: '#e6edf3',
+                minWidth: 160,
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Filter by item ID"
+              value={itemFilter}
+              onChange={(e) => {
+                setPage(1);
+                setItemFilter(e.target.value);
+              }}
+              style={{
+                padding: '0.35rem 0.5rem',
+                background: '#161b22',
+                border: '1px solid #30363d',
+                borderRadius: 6,
+                color: '#e6edf3',
+                minWidth: 140,
+              }}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setPage(1);
+                setStatusFilter(e.target.value);
+              }}
+              style={{
+                padding: '0.35rem 0.5rem',
+                background: '#161b22',
+                border: '1px solid #30363d',
+                borderRadius: 6,
+                color: '#e6edf3',
+                minWidth: 140,
+              }}
+            >
+              <option value="">All statuses</option>
+              <option value="pending">Pending only</option>
+              <option value="done">Done only</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (clearingAll || clearingId != null || meta.total === 0) return;
+                const confirmed = window.confirm(
+                  'This will clear research for ALL inventory items in the current import so they are included in the next research run. This cannot be undone. Continue?'
+                );
+                if (!confirmed) return;
+                setClearingAll(true);
+                apiPost(`${API}/clear-research-all`, {})
+                  .then(() => {
+                    setData((prev) =>
+                      prev.map((row) => ({ ...row, research_completed_at: null }))
+                    );
+                  })
+                  .catch((err) => {
+                    const msg = err?.errors?.message || err?.message || 'Failed to clear all research';
+                    alert(msg);
+                  })
+                  .finally(() => {
+                    setClearingAll(false);
+                  });
+              }}
+              disabled={clearingAll || clearingId != null || meta.total === 0}
+              style={{
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.8125rem',
+                background: clearingAll ? '#21262d' : '#da3633',
+                color: '#f0f6fc',
+                border: '1px solid #f85149',
+                borderRadius: 6,
+                cursor: clearingAll || clearingId != null || meta.total === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {clearingAll ? 'Clearing all…' : 'Clear ALL research'}
+            </button>
+          </div>
+
           <div style={{ overflowX: 'auto', border: '1px solid #30363d', borderRadius: 8, background: '#161b22' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
               <thead>
@@ -134,12 +239,12 @@ export default function Inventories() {
                       <button
                         type="button"
                         onClick={() => handleClearResearch(row)}
-                        disabled={clearingId != null || !row.research_completed_at}
+                        disabled={clearingAll || clearingId != null || !row.research_completed_at}
                         style={{
                           padding: '0.35rem 0.6rem',
                           fontSize: '0.8125rem',
-                          background: row.research_completed_at && clearingId !== row.id ? '#238636' : '#21262d',
-                          color: row.research_completed_at && clearingId !== row.id ? '#fff' : '#8b949e',
+                          background: row.research_completed_at && clearingId !== row.id && !clearingAll ? '#238636' : '#21262d',
+                          color: row.research_completed_at && clearingId !== row.id && !clearingAll ? '#fff' : '#8b949e',
                           border: '1px solid #30363d',
                           borderRadius: 6,
                           cursor: row.research_completed_at && clearingId !== row.id ? 'pointer' : 'not-allowed',

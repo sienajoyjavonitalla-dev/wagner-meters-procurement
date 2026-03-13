@@ -18,7 +18,11 @@ class UserManagementService
 
     public function canAssignSuperAdmin(?User $actor): bool
     {
-        return $actor?->can('assign-super-admin') ?? false;
+        if (! $actor) {
+            return false;
+        }
+
+        return $actor->can('assign-super-admin');
     }
 
     public function listUsers(): array
@@ -33,7 +37,7 @@ class UserManagementService
                 'name' => trim(($u->first_name ?? '').' '.($u->last_name ?? '')) ?: $u->email,
                 'email' => $u->email,
                 'role' => $u->role,
-                'created_at' => $u->created_at?->toIso8601String(),
+                'created_at' => $u->created_at ? $u->created_at->toIso8601String() : null,
             ])
             ->values()
             ->all();
@@ -51,7 +55,7 @@ class UserManagementService
             'role' => $validated['role'],
         ]);
 
-        $auditLog->log('users.created', $actor?->id, 'user', $user->id, [
+        $auditLog->log('users.created', $actor ? $actor->id : null, 'user', $user->id, [
             'email' => $user->email,
             'role' => $user->role,
         ]);
@@ -72,7 +76,7 @@ class UserManagementService
         }
 
         $user->update($payload);
-        $auditLog->log('users.updated', $actor?->id, 'user', $user->id, [
+        $auditLog->log('users.updated', $actor ? $actor->id : null, 'user', $user->id, [
             'fields' => array_keys($payload),
             'from_role' => $oldRole,
             'to_role' => $user->role,
@@ -96,7 +100,7 @@ class UserManagementService
         $deletedEmail = $user->email;
         $user->delete();
 
-        $auditLog->log('users.deleted', $actor?->id, 'user', $deletedUserId, [
+        $auditLog->log('users.deleted', $actor ? $actor->id : null, 'user', $deletedUserId, [
             'email' => $deletedEmail,
         ]);
     }
@@ -107,7 +111,7 @@ class UserManagementService
         $this->guardRoleTransition($oldRole, $targetRole, $actor);
 
         $user->update(['role' => $targetRole]);
-        $auditLog->log('users.role.updated', $actor?->id, 'user', $user->id, [
+        $auditLog->log('users.role.updated', $actor ? $actor->id : null, 'user', $user->id, [
             'from' => $oldRole,
             'to' => $targetRole,
         ]);

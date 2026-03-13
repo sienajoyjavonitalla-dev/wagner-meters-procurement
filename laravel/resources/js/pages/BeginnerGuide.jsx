@@ -34,42 +34,49 @@ export default function BeginnerGuide() {
       <div style={stepStyle}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>1) Single inventory file import</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Open <strong>Data Import</strong>, upload one inventory file (Excel or CSV). Columns A–V are stored as inventory rows; Mfg Part Number 1–5 (W–AA) are stored as MPNs. Submit and wait for the import to complete.
+          Open <strong>Data Import</strong>, upload one inventory file (Excel or CSV). Columns A–V are stored as inventory rows; Mfg Part Number 1–5 (W–AA) are stored as MPNs. Submit and wait for the import to complete. Each full import replaces the previous dataset.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Run research (API + Gemini)</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>2) Review inventory items</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          Go to <strong>Run Controls</strong>, set the batch size (default 5), then click <strong>Start run</strong>. For each item, <strong>current vendor</strong> pricing: if the vendor is DigiKey or Mouser, the app uses that vendor’s API first (tries MPNs in order until one returns a price); otherwise it uses Gemini. <strong>Alternative vendors</strong> are always researched via Gemini (other vendors) plus DigiKey and Mouser APIs when they are not the current vendor.
+          Go to <strong>Inventories</strong> to see all items from the current import, including vendor, product line, quantities, costs, and whether research is <strong>Pending</strong> or <strong>Done</strong>. Use the per-row <strong>Clear research</strong> button (or <strong>Clear ALL research</strong> at the top) to reset items so they will be included again in the next research run.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>3) Monitor run status</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>3) Run research (Gemini)</h3>
+        <p style={{ color: '#8b949e', margin: 0 }}>
+          Go to <strong>Run Controls</strong>, set the batch size (default from settings), then click <strong>Start run</strong>. Each run picks up inventory rows from the current import that do not yet have research completed, calls Gemini (and vendor APIs when applicable) to fetch current-vendor pricing and US-based alternative vendors, and writes results into MPN and alt-vendor tables.
+        </p>
+      </div>
+
+      <div style={stepStyle}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>4) Monitor run status</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
           Stay on <strong>Run Controls</strong> and watch the latest run status (pending, running, completed, failed). Polling updates the status automatically.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>4) Dashboard: queue and savings</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>5) Dashboard and savings</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
           Open <strong>Dashboard</strong> to check queue processed (researched vs pending), needs research count, provider hits (Gemini), and <strong>savings potential per vendor</strong> (based on lowest price per item). Use this to prioritize follow-up and negotiations.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>5) Item Price Comparison</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>6) Item Price Comparison</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
           Use <strong>Price Comparison</strong> to compare items in three sections: <strong>Item</strong> (Item ID, MPN list, Unit cost, Quantity, Total Cost), <strong>Current Vendor</strong> (Vendor link, Current Site Price, Savings vs Total Cost), and <strong>Alternative Vendor with Lowest Price</strong> (Vendor link, Lowest Price, Savings vs Total Cost). Savings are Total Cost minus (price × quantity). Click the view (eye) icon in the alt-vendor column to open a popup listing all alternative vendors with vendor, price, and savings. Filter by vendor, item ID, or minimum savings; export CSV for procurement review.
         </p>
       </div>
 
       <div style={stepStyle}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>6) Users and Profile</h3>
+        <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem', color: '#e6edf3' }}>7) Users and Profile</h3>
         <p style={{ color: '#8b949e', margin: 0 }}>
-          <strong>Users</strong> (super admin only) and <strong>Profile</strong> are unchanged. Re-import when you have new inventory data, trigger another research run, and compare updated recommendations before procurement decisions.
+          <strong>Users</strong> (super admin only) and <strong>Profile</strong> are unchanged. Re-import when you have new inventory data, run research again, optionally clear research on specific items from <strong>Inventories</strong>, and then use Dashboard and Price Comparison for updated recommendations before procurement decisions.
         </p>
       </div>
 
@@ -103,7 +110,7 @@ export default function BeginnerGuide() {
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
           <li>Upload a single inventory file (Excel or CSV) with columns A–V (inventory) and W–AA (MPNs).</li>
-          <li>Submit and confirm import success before running research.</li>
+          <li>Submit and confirm import success before running research. Each completed import becomes the new current dataset.</li>
         </ol>
       </div>
 
@@ -113,13 +120,12 @@ export default function BeginnerGuide() {
             <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
             <polyline points="17 6 23 6 23 12" />
           </svg>
-          Price Comparison
+          Inventories
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Use filters: vendor, item ID, or minimum savings.</li>
-          <li>Review Item (ID, MPN list, Unit cost, Quantity, Total Cost), Current Vendor (vendor link, site price, savings vs total cost), and Alternative Vendor (vendor link, lowest price, savings vs total cost). Savings = Total Cost − (price × quantity).</li>
-          <li>Click the view (eye) icon in the alt-vendor column to see all alternative vendors for that item in a popup (vendor, price, savings).</li>
-          <li>Export CSV for procurement review and negotiations.</li>
+          <li>Review items from the current import: item ID, description, vendor, product line, quantities, and costs.</li>
+          <li>Check research status for each row (Pending vs Done).</li>
+          <li>Use <strong>Clear research</strong> on a single item (or <strong>Clear ALL research</strong> at the top) to reset research so those rows are included in the next run.</li>
         </ol>
       </div>
 
@@ -128,12 +134,30 @@ export default function BeginnerGuide() {
           <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="5 3 19 12 5 21 5 3" />
           </svg>
+          Price Comparison
+        </h3>
+        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
+          <li>Use filters: vendor, item ID, or minimum savings.</li>
+          <li>Review Item (ID, MPN list, Unit cost, Quantity, Total Cost), Current Vendor (vendor link, lowest current site price, savings vs total cost), and Alternative Vendor (vendor link, lowest price, savings vs total cost). Savings are calculated from total cost versus the researched price.</li>
+          <li>Click the view (eye) icon in the alt-vendor column to see all alternative vendors for that item in a popup (vendor, price, savings).</li>
+          <li>Export CSV for procurement review and negotiations.</li>
+        </ol>
+      </div>
+
+      <div style={stepStyle}>
+        <h3 style={headingRowStyle}>
+          <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
           Run Controls
         </h3>
         <ol style={{ margin: 0, paddingLeft: '1.25rem', color: '#8b949e', lineHeight: 1.65 }}>
-          <li>Set batch size (default 5); optionally save research settings (e.g. Batch size (Gemini)).</li>
-          <li>Click <strong>Start run</strong> to trigger a research run (DigiKey/Mouser API when applicable, then Gemini for current and alt vendors). Monitor status (pending, running, completed, failed).</li>
-          <li>Adjust settings only if you understand the impact.</li>
+          <li>Set batch size (Gemini) and other research settings as needed; save settings if you want them reused.</li>
+          <li>Click <strong>Start run</strong> to trigger a research run. Monitor status (pending, running, completed, failed) in the same view.</li>
+          <li>Use <strong>Refresh status</strong> if needed, and adjust settings only if you understand the impact.</li>
         </ol>
       </div>
 

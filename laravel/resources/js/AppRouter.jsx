@@ -8,6 +8,7 @@ import Profile from './pages/Profile';
 import PriceComparison from './pages/PriceComparison';
 import RunControls from './pages/RunControls';
 import Inventories from './pages/Inventories';
+import ResearchedMpn from './pages/ResearchedMpn';
 import BeginnerGuide from './pages/BeginnerGuide';
 import Users from './pages/Users';
 import Welcome from './pages/Welcome';
@@ -39,6 +40,7 @@ export default function AppRouter() {
             <Route path="dashboard/price-comparison" element={<PriceComparison />} />
             <Route path="dashboard/run-controls" element={<RunControls />} />
             <Route path="dashboard/inventories" element={<Inventories />} />
+            <Route path="dashboard/researched-mpn" element={<ResearchedMpn />} />
             <Route path="dashboard/how-to-use" element={<BeginnerGuide />} />
             <Route path="dashboard/users" element={<Users />} />
             <Route path="data-import" element={<DataImport />} />

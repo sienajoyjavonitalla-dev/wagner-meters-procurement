@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ProcurementController;
+use App\Http\Controllers\Api\ResearchedMpnController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/procurement/inventories', [InventoryController::class, 'index']);
     Route::post('/procurement/inventories/{inventory}/clear-research', [InventoryController::class, 'clearResearch'])->middleware('can:manage-procurement');
+    Route::post('/procurement/inventories/clear-research-all', [InventoryController::class, 'clearAllResearch'])->middleware('can:manage-procurement');
+    Route::get('/procurement/researched-mpn', [ResearchedMpnController::class, 'index'])->middleware('can:manage-procurement');
     Route::get('/procurement/summary', [ProcurementController::class, 'summary']);
     Route::get('/procurement/analytics', [ProcurementController::class, 'analytics']);
     Route::get('/procurement/queue', [ProcurementController::class, 'queue']);

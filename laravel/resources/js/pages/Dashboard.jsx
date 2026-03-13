@@ -162,24 +162,32 @@ export default function Dashboard() {
         </ChartContainer>
         <ChartContainer title="Savings potential per vendor">
           {savingsPerVendor.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e6edf3', fontSize: '0.875rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #30363d' }}>
-                    <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', color: '#8b949e' }}>Vendor</th>
-                    <th style={{ textAlign: 'right', padding: '0.5rem 0.75rem', color: '#8b949e' }}>Savings potential</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savingsPerVendor.map((row) => (
-                    <tr key={row.vendor_name ?? row.supplier_name} style={{ borderBottom: '1px solid #30363d' }}>
-                      <td style={{ padding: '0.5rem 0.75rem' }}>{row.vendor_name ?? row.supplier_name}</td>
-                      <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>{formatSavings(row.savings_total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={savingsPerVendor.map((row) => ({
+                  name: row.vendor_name ?? row.supplier_name,
+                  savings_total: row.savings_total,
+                }))}
+                margin={{ top: 8, right: 8, left: 8, bottom: 40 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.cartesianGrid.stroke} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: chartTheme.tick, fontSize: 11 }}
+                  interval={0}
+                  angle={-35}
+                  textAnchor="end"
+                />
+                <YAxis tick={{ fill: chartTheme.tick }} />
+                <Tooltip
+                  formatter={(value) => formatSavings(value)}
+                  contentStyle={chartTheme.tooltip.contentStyle}
+                  labelStyle={chartTheme.tooltip.labelStyle}
+                  itemStyle={chartTheme.tooltip.itemStyle}
+                />
+                <Bar dataKey="savings_total" fill={chartTheme.bar.fill} radius={[4, 4, 0, 0]} name="Savings" />
+              </BarChart>
+            </ResponsiveContainer>
           ) : (
             <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>No vendor savings data yet.</p>
           )}

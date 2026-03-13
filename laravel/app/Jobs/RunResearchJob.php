@@ -34,7 +34,7 @@ class RunResearchJob implements ShouldQueue
         if ($run) {
             $run->update(['status' => 'running', 'message' => 'Research job started.']);
         }
-        $auditLog->log('research.run.started', null, 'research_run', $run?->id, [
+        $auditLog->log('research.run.started', null, 'research_run', $run ? $run->id : null, [
             'limit' => $this->limit,
             'inventory_id' => $this->inventoryId,
         ]);
@@ -78,7 +78,7 @@ class RunResearchJob implements ShouldQueue
                         'completed_at' => now(),
                     ]);
                 }
-                $auditLog->log('research.run.completed', null, 'research_run', $run?->id, ['gemini_hits' => 0]);
+                $auditLog->log('research.run.completed', null, 'research_run', $run ? $run->id : null, ['gemini_hits' => 0]);
                 return;
             }
 
@@ -152,7 +152,7 @@ class RunResearchJob implements ShouldQueue
                     'completed_at' => now(),
                 ]);
             }
-            $auditLog->log('research.run.completed', null, 'research_run', $run?->id, [
+            $auditLog->log('research.run.completed', null, 'research_run', $run ? $run->id : null, [
                 'gemini_hits' => $geminiHits,
                 'processed' => $inventories->count(),
                 'success_count' => $successCount,
@@ -167,7 +167,7 @@ class RunResearchJob implements ShouldQueue
                     'completed_at' => now(),
                 ]);
             }
-            $auditLog->log('research.run.failed', null, 'research_run', $run?->id, [
+            $auditLog->log('research.run.failed', null, 'research_run', $run ? $run->id : null, [
                 'error' => $e->getMessage(),
             ]);
             throw $e;

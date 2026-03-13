@@ -29,7 +29,7 @@ class DataImportController extends Controller
 
         $import = DataImport::create([
             'type' => 'full',
-            'user_id' => $request->user()?->id,
+            'user_id' => $request->user() ? $request->user()->id : null,
             'file_names' => [
                 'inventory' => $file->getClientOriginalName(),
             ],

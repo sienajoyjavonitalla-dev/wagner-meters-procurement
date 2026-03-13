@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AltVendor;
 use App\Models\DataImport;
 use App\Models\Inventory;
-use App\Models\Mpn;
+use App\Services\InventoryResearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -33,8 +32,26 @@ class InventoryController extends Controller
         $perPage = max(1, min(100, (int) $request->input('per_page', 25)));
         $query = Inventory::query()
             ->where('data_import_id', $importId)
-            ->withCount('mpns')
-            ->orderBy('id');
+            ->withCount('mpns');
+
+        $vendor = trim((string) $request->input('vendor', ''));
+        if ($vendor !== '') {
+            $query->where('vendor_name', 'like', '%'.$vendor.'%');
+        }
+
+        $itemId = trim((string) $request->input('item_id', ''));
+        if ($itemId !== '') {
+            $query->where('item_id', 'like', '%'.$itemId.'%');
+        }
+
+        $status = (string) $request->input('status', '');
+        if ($status === 'pending') {
+            $query->whereNull('research_completed_at');
+        } elseif ($status === 'done') {
+            $query->whereNotNull('research_completed_at');
+        }
+
+        $query->orderBy('id');
 
         $paginator = $query->paginate($perPage);
         $items = $paginator->getCollection()->map(function (Inventory $inv) {
@@ -66,29 +83,41 @@ class InventoryController extends Controller
     /**
      * Clear research for a single inventory (reset so it can be re-researched).
      */
-    public function clearResearch(Inventory $inventory): JsonResponse
+    public function clearResearch(Inventory $inventory, InventoryResearchService $research): JsonResponse
     {
         $importId = $this->currentImportId();
         if ($importId === null || $inventory->data_import_id !== $importId) {
             return response()->json(['message' => 'Inventory not found or not in current import.'], 404);
         }
 
-        $mpnIds = $inventory->mpns()->pluck('id')->all();
-        if ($mpnIds !== []) {
-            AltVendor::query()->whereIn('mpn_id', $mpnIds)->delete();
-            Mpn::query()->whereIn('id', $mpnIds)->update([
-                'unit_price' => null,
-                'url' => null,
-                'price_fetched_at' => null,
-                'currency' => null,
-            ]);
-        }
-
-        $inventory->update([
-            'research_completed_at' => null,
-            'gemini_response_json' => null,
-        ]);
+        $research->clearInventoryResearch($inventory);
 
         return response()->json(['message' => 'Research cleared. Item will be picked up on the next research run.']);
+    }
+
+    /**
+     * Clear research for all inventories in the current import.
+     */
+    public function clearAllResearch(InventoryResearchService $research): JsonResponse
+    {
+        $importId = $this->currentImportId();
+        if ($importId === null) {
+            return response()->json(['message' => 'No current import to clear.'], 404);
+        }
+
+        $import = DataImport::find($importId);
+        if (! $import) {
+            return response()->json(['message' => 'No current import to clear.'], 404);
+        }
+
+        $cleared = $research->clearAllForImport($import);
+        if ($cleared === 0) {
+            return response()->json(['message' => 'No inventory rows for current import.']);
+        }
+
+        return response()->json([
+            'message' => 'Cleared research for all inventories in the current import.',
+            'cleared_inventories' => $cleared,
+        ]);
     }
 }
